@@ -1,0 +1,67 @@
+[
+  {
+    "metrics": "Revenue_mean_30d",
+    "value": "",
+    "note": "Generation: rev_90d is built from log-normal daily_revenue. growth_target by regime: HIGH_RISK: [-1.0, -0.05] LOW_RISK: [0.2, 0.95] NORMAL: [-0.2, 0.3] rev_30d = rev_90d * (1 + growth_target) * uniform(0.97, 1.03) clipped to [500,000, 10,000,000] Nature: short-term 30-day mean revenue."
+  },
+  {
+    "metrics": "Revenue_mean_90d",
+    "value": "",
+    "note": "Generation: daily_revenue ~ LogNormal(log(2,500,000), sigma=0.75) clipped to [500,000, 10,000,000] rev_90d = daily_revenue * uniform(0.85, 1.15), then clipped. Nature: longer-horizon (90-day) baseline mean revenue."
+  },
+  {
+    "metrics": "Txn_frequency",
+    "value": "",
+    "note": "By regime: HIGH_RISK: uniform(5, 30) LOW_RISK: uniform(35, 80) NORMAL: uniform(10, 60) clipped to [5, 80] Nature: POS transaction intensity/activity signal."
+  },
+  {
+    "metrics": "regime",
+    "value": "NORMAL 0.70, HIGH_RISK 0.15, LOW_RISK 0.15.",
+    "note": "Probabilities: NORMAL 0.70, HIGH_RISK 0.15, LOW_RISK 0.15. Nature: latent business regime controlling multiple generation dynamics."
+  },
+  {
+    "metrics": "Growth_value",
+    "value": "(Revenue_mean_30d - Revenue_mean_90d) / Revenue_mean_90d, clipped to [-1, 1].",
+    "note": "Formula: (Revenue_mean_30d - Revenue_mean_90d) / Revenue_mean_90d, clipped to [-1, 1]. Nature: raw realized revenue growth signal."
+  },
+  {
+    "metrics": "Growth_score",
+    "value": "Growth_score = (Growth_value + 1) / 2.",
+    "note": "Formula: Growth_score = (Growth_value + 1) / 2. Nature: normalized growth score from [-1,1] to [0,1]."
+  },
+  {
+    "metrics": "CV_value",
+    "value": "",
+    "note": "Generation: Regime base: HIGH_RISK: [0.4, 0.8] LOW_RISK: [0.02, 0.15] NORMAL: [0.1, 0.4] Tenure adjustments: <2 years: +0.03 to +0.10 >8 years: -0.01 to -0.05 Consistency constraints: Txn_frequency > 60 -> CV <= 0.25 Txn_frequency < 12 -> CV >= 0.45 HIGH_RISK/TRADE_RISK industries -> CV >= 0.30 Nature: cash-flow volatility proxy, core risk signal."
+  },
+  {
+    "metrics": "CV_score",
+    "value": "CV_score = 1 - min(CV_value / 0.45, 1.0).",
+    "note": "Main formula: CV_score = 1 - min(CV_value / 0.45, 1.0). Extra penalty: if CV_value > 0.6, subtract 0.10 (floored at 0). Nature: cash-flow stability score; higher CV means lower score."
+  },
+  {
+    "metrics": "Spike_ratio",
+    "value": "",
+    "note": "By regime: HIGH_RISK: [1.5, 2.5] LOW_RISK: [1.0, 1.2] NORMAL: [1.0, 1.8] Constraint: if Growth_score > 0.7, cap spike_ratio at 1.4. Nature: dependence on revenue spikes."
+  },
+  {
+    "metrics": "Spike_score",
+    "value": "Spike_score = max(0, 1 - (Spike_ratio - 1.0) / 1.2).",
+    "note": "Formula: Spike_score = max(0, 1 - (Spike_ratio - 1.0) / 1.2). Nature: spike-stability score; lower spike_ratio gives higher score."
+  },
+  {
+    "metrics": "Txn_freq_score",
+    "value": "log(1 + Txn_frequency) / log(81).",
+    "note": "Formula: log(1 + Txn_frequency) / log(81). Nature: log-normalized transaction frequency score in [0,1]."
+  },
+  {
+    "metrics": "Years_score",
+    "value": "Years_score = min(years_in_business / 15, 1.0).",
+    "note": "Formula: Years_score = min(years_in_business / 15, 1.0). Nature: operational maturity score."
+  },
+  {
+    "metrics": "Industry_score",
+    "value": "",
+    "note": "Base score by group: LOW_RISK: 0.93 MEDIUM_RISK: 0.72 SERVICE_RISK: 0.65 TECHNICAL_RISK: 0.65 HIGH_RISK: 0.35 TRADE_RISK: 0.50 ASSET_BASED: 0.80 Then add uniform noise (-0.05, +0.05), clipped to [0,1]. Nature: structural industry risk score."
+  }
+]
