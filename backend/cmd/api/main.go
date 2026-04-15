@@ -53,6 +53,7 @@ func run() error {
 	closer.Add(loanService.Close)
 
 	httpHandler := handlers.NewHTTPHandler(loanService)
+	sseHandler := handlers.NewSSEHandler(rdb)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -77,6 +78,7 @@ func run() error {
 	})
 
 	r.POST("api/loans/evaluate", httpHandler.EvaluateLoan)
+	r.GET("api/loans/stream", sseHandler.SubscribeToMerchantStatus)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerPort,
