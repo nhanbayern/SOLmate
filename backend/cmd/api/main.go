@@ -42,10 +42,11 @@ func run() error {
 
 	pgRepo := repositories.NewPostgresRepo(pgDB)
 	redisRepo := repositories.NewRedisRepo(rdb)
+	agentService := services.NewAgentService(cfg.ToAgentServiceConfig())
 
 	dllPath := "./ai_models/onnxruntime.dll"
 	modelPath := "./ai_models/XGBoost.onnx"
-	loanService, err := services.NewLoanService(pgRepo, redisRepo, cfg.ToLoanServiceConfig(), dllPath, modelPath)
+	loanService, err := services.NewLoanService(pgRepo, redisRepo, agentService, cfg.ToLoanServiceConfig(), dllPath, modelPath)
 	if err != nil {
 		return fmt.Errorf("init loan service: %w", err)
 	}

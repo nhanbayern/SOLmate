@@ -24,9 +24,14 @@ type LoanRedisRepo interface {
 	PublishUpdate(ctx context.Context, merchantID string, message string) error
 }
 
+type LoanAgentService interface {
+	ReviewRisk(ctx context.Context, reqData models.AgentRiskRequest) (*models.AgentRiskResponse, error)
+}
+
 type LoanService struct {
 	pgRepo       LoanPostgresRepo
 	redisRepo    LoanRedisRepo
+	agentService LoanAgentService
 	session      *ort.AdvancedSession
 	inputTensor  *ort.Tensor[float32]
 	outputTensor *ort.Tensor[float32]
@@ -35,7 +40,13 @@ type LoanService struct {
 	log          *slog.Logger
 }
 
-func NewLoanService(pgRepo LoanPostgresRepo, redisRepo LoanRedisRepo, cfg config.LoanServiceConfig, dllPath, modelPath string) (*LoanService, error) {
+func NewLoanService(
+	pgRepo LoanPostgresRepo,
+	redisRepo LoanRedisRepo,
+	agentService LoanAgentService,
+	cfg config.LoanServiceConfig,
+	dllPath, modelPath string,
+) (*LoanService, error) {
 	logger := infrastructure.GetLogger("LOAN_SERVICE")
 
 	ort.SetSharedLibraryPath(dllPath)
@@ -77,6 +88,7 @@ func NewLoanService(pgRepo LoanPostgresRepo, redisRepo LoanRedisRepo, cfg config
 	return &LoanService{
 		pgRepo:       pgRepo,
 		redisRepo:    redisRepo,
+		agentService: agentService,
 		cfg:          cfg,
 		log:          logger,
 		session:      session,
@@ -102,7 +114,7 @@ func (s *LoanService) publishError(ctx context.Context, merchantID string, reaso
 
 func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID string) error {
 	s.log.Debug(
-		"Loan evaluation started (ML Scoring Only)",
+		"Loan evaluation started",
 		"loan_id", loanID,
 		"merchant_id", merchantID,
 	)
@@ -121,6 +133,19 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID s
 		s.publishError(ctx, merchantID, "No transaction features found in cache")
 
 		return fmt.Errorf("get features: %w", err)
+	}
+
+	if len(merchantData.Features) < s.cfg.FeatureCount {
+		err := fmt.Errorf("expected %d, got %d", s.cfg.FeatureCount, len(merchantData.Features))
+		s.log.Error(
+			"Feature validation failed",
+			"loan_id", loanID,
+			infrastructure.KeyError, err.Error(),
+		)
+
+		s.publishError(ctx, merchantID, "Feature validation failed")
+
+		return fmt.Errorf("validate features: %w", err)
 	}
 
 	modelFeatures := make([]float32, s.cfg.FeatureCount)
@@ -168,10 +193,74 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID s
 		riskLabel = "VERY_LOW"
 	}
 
+	s.log.Info(
+		"Model evaluated successfully",
+		"loan_id", loanID,
+		"merchant_id", merchantID,
+		"score", score,
+		"risk_label", riskLabel,
+		"pd_value", fmt.Sprintf("%.4f", pdValue),
+	)
+
+	agentReq := models.AgentRiskRequest{
+		CustomerID:      merchantID,
+		CreditScore:     float64(score),
+		RiskClass:       riskLabel,
+		RiskProbability: pdValue,
+	}
+
+	f := merchantData.Features
+
+	if len(f) >= 12 {
+		agentReq.Metrics = models.AgentMetrics{
+			RevenueMean30d: f[0],
+			RevenueMean90d: f[1],
+			TxnFrequency:   f[2],
+			GrowthValue:    f[3],
+			GrowthScore:    f[4],
+			CVValue:        f[5],
+			CVScore:        f[6],
+			SpikeRatio:     f[7],
+			SpikeScore:     f[8],
+			TxnFreqScore:   f[9],
+			YearsScore:     f[10],
+			IndustryScore:  f[11],
+			Regime:         riskLabel,
+		}
+	} else if len(f) >= 6 {
+		agentReq.Metrics = models.AgentMetrics{
+			RevenueMean30d: f[0],
+			RevenueMean90d: f[1],
+			TxnFrequency:   f[2],
+			GrowthValue:    f[3],
+			CVValue:        f[4],
+			SpikeRatio:     f[5],
+			Regime:         riskLabel,
+		}
+	}
+
+	var reportText string
+	agentRes, err := s.agentService.ReviewRisk(ctx, agentReq)
+	if err != nil {
+		s.log.Warn(
+			"Agent review failed",
+			"loan_id", loanID,
+			"merchant_id", merchantID,
+			"score", score,
+			"risk_label", riskLabel,
+			"pd_value", fmt.Sprintf("%.4f", pdValue),
+			infrastructure.KeyError, err.Error(),
+		)
+
+		reportText = "AI Agent hiện không khả dụng để phân tích báo cáo chi tiết."
+	} else {
+		reportText = agentRes.ReportText
+	}
+
 	dbCtx, dbCancel := context.WithTimeout(ctx, s.cfg.DBTimeout)
 	defer dbCancel()
 
-	if err := s.pgRepo.UpdateLoanAIReport(dbCtx, loanID, score, riskLabel, pdValue, ""); err != nil {
+	if err := s.pgRepo.UpdateLoanAIReport(dbCtx, loanID, score, riskLabel, pdValue, reportText); err != nil {
 		s.log.Error(
 			"Update database failed",
 			"loan_id", loanID,
