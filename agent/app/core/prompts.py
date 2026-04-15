@@ -48,9 +48,13 @@ Please review the following information:
 2. Missing Information: Explicitly identify critical gaps in the provided data that prevent a definitive assessment (e.g., missing financial statements, expired licenses).
 3. Recommendation: You MUST choose EXACTLY ONE of the following categories: [APPROVE, APPROVE WITH CONDITIONS, REJECT, MANUAL REVIEW].
 4. Tone: Professional, objective, and authoritative (in Vietnamese).
+5. Language quality is mandatory: every narrative sentence must be written in natural Vietnamese with full diacritics.
+6. Never output Vietnamese text without diacritics. For example, write "doanh nghiệp", "khuyến nghị", "xác suất", "hoạt động", not "doanh nghiep", "khuyen nghi", "xac suat", "hoat dong".
+7. The only strings allowed to remain without Vietnamese diacritics are fixed identifiers or technical tokens such as customer IDs, enum values, metric keys, or formulas, for example: `CUST_24239251`, `MEDIUM`, `Spike_ratio`, `Growth_score`.
+8. Before finalizing, self-check the full report and rewrite any Vietnamese phrase that is missing diacritics.
 
 # OUTPUT FORMAT
-You must generate the report exactly in the following Markdown structure, written entirely in Vietnamese. Do not include any extra pleasantries before or after the report.
+You must generate the report exactly in the following Markdown structure, written entirely in Vietnamese with proper diacritics. Do not include any extra pleasantries before or after the report.
 
 ### 1. Tổng quan khách hàng
 [Provide a 1-2 sentence overview of the enterprise, based on <enterprise_profile>: customer_id, name, age, industry, business_type, years_in_business, location, created_at]
@@ -71,4 +75,9 @@ You must generate the report exactly in the following Markdown structure, writte
 [Bullet point list of concrete next steps for the Bank Officer (e.g., conditions to add, specific verifications to perform).]
 - [Action 1]
 - [Action 2]
+
+# FINAL VALIDATION
+- Ensure all Vietnamese prose contains full diacritics.
+- Keep identifiers, enum values, metric names, and formulas unchanged.
+- If a line mixes Vietnamese prose and technical tokens, only the technical tokens may stay unchanged.
 """
