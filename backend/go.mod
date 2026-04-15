@@ -7,6 +7,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/segmentio/kafka-go v0.4.50
+	github.com/yalue/onnxruntime_go v1.27.0
 )
 
 require (
