@@ -11,7 +11,7 @@ from app.pipeline import (
     load_loan_advisory_payload,
     load_risk_review_payload,
 )
-from app.schemas.loan_models import EnterpriseCICMetrics, RiskReviewResult
+from app.schemas.loan_models import EnterpriseCICMetrics, EnterpriseProfile, RiskReviewResult
 
 
 class AdvisoryRequest(BaseModel):
@@ -42,10 +42,15 @@ class RiskReviewRequest(EnterpriseCICMetrics):
         default="dataset",
         description="Directory containing credit_score_rules.json and cic_metrics_spec.json.",
     )
+    enterprise_profile: EnterpriseProfile | None = Field(
+        default=None,
+        description="Optional basic enterprise profile used to enrich the final report.",
+    )
 
 
 class RiskReviewResponse(BaseModel):
     customer_id: str
+    enterprise_overview: str
     provided_risk_class: str
     expected_risk_class: str
     provided_risk_probability: float
@@ -55,7 +60,10 @@ class RiskReviewResponse(BaseModel):
     risk_probability_is_reasonable: bool
     recommendation: str
     summary: str
+    current_overview: str
+    bank_advice: str
     findings: list[str]
+    next_actions: list[str]
     report_text: str
 
 
@@ -118,12 +126,13 @@ def review_risk_input(request: RiskReviewRequest) -> RiskReviewResponse:
         service = build_risk_review_service()
         references = load_risk_review_payload(dataset_dir=request.dataset_dir)
         enterprise_cic_metrics = EnterpriseCICMetrics(
-            **request.model_dump(exclude={"dataset_dir"})
+            **request.model_dump(exclude={"dataset_dir", "enterprise_profile"})
         )
         result: RiskReviewResult = service.run(
             credit_score_rules=references["credit_score_rules"],
             cic_metric_specs=references["cic_metric_specs"],
             enterprise_cic_metrics=enterprise_cic_metrics,
+            enterprise_profile=request.enterprise_profile,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -132,6 +141,7 @@ def review_risk_input(request: RiskReviewRequest) -> RiskReviewResponse:
 
     return RiskReviewResponse(
         customer_id=result.risk_assessment.customer_id,
+        enterprise_overview=result.enterprise_overview,
         provided_risk_class=result.review.provided_risk_class,
         expected_risk_class=result.review.expected_risk_class,
         provided_risk_probability=result.review.provided_risk_probability,
@@ -139,8 +149,11 @@ def review_risk_input(request: RiskReviewRequest) -> RiskReviewResponse:
         expected_probability_band=result.review.expected_probability_band,
         risk_class_is_reasonable=result.review.risk_class_is_reasonable,
         risk_probability_is_reasonable=result.review.risk_probability_is_reasonable,
-        recommendation=result.risk_assessment.recommendation,
+        recommendation=result.review.reviewed_recommendation,
         summary=result.risk_assessment.summary,
+        current_overview=result.current_overview,
+        bank_advice=result.bank_advice,
         findings=result.review.findings,
+        next_actions=result.next_actions,
         report_text=result.report_text,
     )

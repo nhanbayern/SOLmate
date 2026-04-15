@@ -66,12 +66,18 @@ class RiskReasonablenessReview(BaseModel):
     expected_probability_band: str
     risk_class_is_reasonable: bool
     risk_probability_is_reasonable: bool
+    reviewed_recommendation: str = ""
     findings: list[str] = Field(default_factory=list)
 
 
 class RiskReviewResult(BaseModel):
+    enterprise_profile: EnterpriseProfile
     risk_assessment: RiskAssessmentResult
     review: RiskReasonablenessReview
+    enterprise_overview: str
+    current_overview: str
+    bank_advice: str
+    next_actions: list[str] = Field(default_factory=list)
     report_text: str
 
 

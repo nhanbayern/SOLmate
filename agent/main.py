@@ -9,7 +9,7 @@ from app.pipeline import (
     build_risk_review_service,
     load_risk_review_payload,
 )
-from app.schemas.loan_models import EnterpriseCICMetrics
+from app.schemas.loan_models import EnterpriseCICMetrics, EnterpriseProfile
 
 
 def main() -> None:
@@ -46,10 +46,14 @@ def main() -> None:
         payload = json.loads(Path(args.input_file).read_text(encoding="utf-8"))
         service = build_risk_review_service()
         references = load_risk_review_payload(dataset_dir=args.dataset_dir)
+        enterprise_profile = None
+        if "enterprise_profile" in payload:
+            enterprise_profile = EnterpriseProfile(**payload.pop("enterprise_profile"))
         result = service.run(
             credit_score_rules=references["credit_score_rules"],
             cic_metric_specs=references["cic_metric_specs"],
             enterprise_cic_metrics=EnterpriseCICMetrics(**payload),
+            enterprise_profile=enterprise_profile,
         )
         print(result.report_text)
         return

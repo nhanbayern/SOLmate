@@ -45,3 +45,7 @@ def test_risk_review_flags_low_label_as_unreasonable_for_high_risk_signals():
     assert result.review.risk_class_is_reasonable is False
     assert result.review.risk_probability_is_reasonable is False
     assert result.risk_assessment.matched_rule.level == "POOR"
+    assert result.review.reviewed_recommendation == "REJECT"
+    assert "### 1. Thông Tin Cơ Bản Doanh Nghiệp" in result.report_text
+    assert "### 2. Kiểm Tra Lại Phân Loại Risk Class" in result.report_text
+    assert "### 4. Khuyến Nghị Cho Nhân Viên Ngân Hàng" in result.report_text

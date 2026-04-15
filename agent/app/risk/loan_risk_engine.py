@@ -109,6 +109,11 @@ class LoanRiskEngine:
         probability_is_reasonable = (
             probability_band[0] <= enterprise_cic_metrics.risk_probability <= probability_band[1]
         )
+        reviewed_recommendation = self._decide_recommendation(
+            matched_rule=matched_rule,
+            risk_class=expected_risk_class,
+            risk_probability=expected_probability,
+        )
 
         findings = [
             (
@@ -140,6 +145,7 @@ class LoanRiskEngine:
             expected_probability_band=self._format_probability_band(probability_band),
             risk_class_is_reasonable=provided_risk_class == expected_risk_class,
             risk_probability_is_reasonable=probability_is_reasonable,
+            reviewed_recommendation=reviewed_recommendation,
             findings=findings,
         )
 
