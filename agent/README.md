@@ -123,3 +123,215 @@ Response shape:
   "summary": "..."
 }
 ```
+
+
+## Pipeline
+                    +------------------+
+                    | CLI / FastAPI    |
+                    | main.py / api.py |
+                    +---------+--------+
+                              |
+                              v
+                 +------------+-------------+
+                 | load_loan_advisory_payload|
+                 | app/pipeline.py           |
+                 +------------+-------------+
+                              |
+      +-----------------------+------------------------+
+      |                        |                        |
+      v                        v                        v
++-------------+       +----------------+      +----------------------+
+|Enterprise   |       |CreditScoreRule |      |EnterpriseCICMetrics  |
+|Profile      |       |list            |      |+ CICMetricSpec list  |
++------+------+       +--------+-------+      +----------+-----------+
+       \                        |                         /
+        \                       |                        /
+         \                      |                       /
+          +---------------------+----------------------+
+                                |
+                                v
+                  +-------------+-------------+
+                  | LoanAdvisoryService.run() |
+                  +-------------+-------------+
+                                |
+                                v
+                  +-------------+-------------+
+                  | LoanRiskEngine.evaluate() |
+                  +-------------+-------------+
+                                |
+                                v
+                  +---------------------------+
+                  | RiskAssessmentResult       |
+                  | - matched_rule             |
+                  | - risk_class               |
+                  | - recommendation           |
+                  | - summary                  |
+                  | - top_risk_factors         |
+                  | - advisory_query           |
+                  +-------------+-------------+
+                                |
+                                v
+                  +-------------+-------------+
+                  | Query Rewriter            |
+                  | Mock / Qwen               |
+                  +-------------+-------------+
+                                |
+                                v
+                  +-------------+-------------+
+                  | Query Preprocessor        |
+                  | - segment                 |
+                  | - remove stopwords(BM25)  |
+                  | - trim / split query      |
+                  +-------------+-------------+
+                                |
+                                v
+                  +---------------------------+
+                  | QueryVariant              |
+                  | - original_text           |
+                  | - rewritten_text          |
+                  | - bm25_text               |
+                  | - dense_text              |
+                  | - retrieval_units         |
+                  +-------------+-------------+
+                                |
+                                v
+                  +-------------+-------------+
+                  | Retriever                 |
+                  | demo: BM25 + Dense mock   |
+                  | prod: Milvus dense search |
+                  +-------------+-------------+
+                                |
+                                v
+                  +---------------------------+
+                  | list[RetrievalResult]     |
+                  | = ranked legal chunks     |
+                  +-------------+-------------+
+                                |
+                                v
+                  +-------------+-------------+
+                  | ArticleMapper             |
+                  | chunk -> legal article    |
+                  +-------------+-------------+
+                                |
+                                v
+                  +---------------------------+
+                  | list[LegalArticle]        |
+                  | top_k_articles            |
+                  +-------------+-------------+
+                                |
+                                v
+                  +-------------+-------------+
+                  | Advisory Generator        |
+                  | Mock / Qwen               |
+                  +-------------+-------------+
+                                |
+                                v
+                  +---------------------------+
+                  | AdvisoryReport            |
+                  | - recommendation          |
+                  | - summary                 |
+                  | - legal_basis             |
+                  | - suggested_actions       |
+                  | - report_text             |
+                  +-------------+-------------+
+                                |
+                                v
+                  +---------------------------+
+                  | LoanAdvisoryResult        |
+                  | output nội bộ đầy đủ      |
+                  +-------------+-------------+
+                                |
+               +----------------+----------------+
+               |                                 |
+               v                                 v
+    +-----------------------+         +----------------------------+
+    | CLI output            |         | API response               |
+    | report.report_text    |         | customer_id, mode,         |
+    |                       |         | report_text,               |
+    |                       |         | recommendation, summary    |
+    +-----------------------+         +----------------------------+
+
+
+## Sơ Đồ Chi Tiết Phần Retrieval
+advisory_query
+    |
+    v
+rewritten_query
+    |
+    v
+QueryVariant
+    |
+    +--> bm25_text -----------+
+    |                         |
+    +--> dense_text           |
+    |                         v
+    +--> retrieval_units --> Dense Embedder --> Milvus Search --> dense hits
+                             
+demo mode:
+bm25_text --> MockBM25
+dense_text -> MockDense
+MockBM25 + MockDense --> normalize score --> weighted merge
+
+prod mode:
+retrieval_units -> BKAI encoder -> vector -> Milvus
+Milvus hits -> normalize dense score -> rank
+
+ranked chunks
+    |
+    v
+deduplicate by article_id
+    |
+    v
+top legal articles for report generation
+
+
+
+## Pipeline Ingestion Vào Milvus
+vietnamese-bank-legal.json
+            |
+            v
++---------------------------+
+| JSONDataLoader            |
+| load_legal_articles()     |
++-------------+-------------+
+              |
+              v
++---------------------------+
+| list[LegalArticle]        |
++-------------+-------------+
+              |
+              v
++---------------------------+
+| LegalTextChunker          |
+| - section chunking        |
+| - overlap chunking        |
++-------------+-------------+
+              |
+              v
++---------------------------+
+| list[LegalChunk]          |
++-------------+-------------+
+              |
+              v
++---------------------------+
+| ChunkPreprocessor         |
+| - segment                 |
+| - dense_text              |
+| - bm25_text               |
++-------------+-------------+
+              |
+              v
++---------------------------+
+| BKAI Bi-Encoder           |
+| dense vector              |
++-------------+-------------+
+              |
+              v
++---------------------------+
+| Milvus Collection         |
+| - chunk_id                |
+| - article_id              |
+| - dense_text              |
+| - dense_vector            |
+| - metadata                |
++---------------------------+
