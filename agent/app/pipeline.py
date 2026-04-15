@@ -18,6 +18,7 @@ from app.retrieval.hybrid_retriever import HybridRetriever
 from app.retrieval.milvus_hybrid_retriever import MilvusHybridRetriever
 from app.schemas.models import LegalArticle, LegalChunk
 from app.services.loan_advisory_service import LoanAdvisoryService
+from app.services.loan_risk_review_service import LoanRiskReviewService
 from app.vectorstores.milvus_store import MilvusVectorStore
 
 
@@ -40,6 +41,21 @@ def load_loan_advisory_payload(
             customer_id=customer_id,
         ),
     }
+
+
+def load_risk_review_payload(
+    dataset_dir: str | Path = "dataset",
+) -> dict[str, object]:
+    loader = JSONDataLoader()
+    dataset_path = Path(dataset_dir)
+    return {
+        "credit_score_rules": loader.load_credit_score_rules(dataset_path / "credit_score_rules.json"),
+        "cic_metric_specs": loader.load_cic_metric_specs(dataset_path / "cic_metrics_spec.json"),
+    }
+
+
+def build_risk_review_service() -> LoanRiskReviewService:
+    return LoanRiskReviewService(risk_engine=LoanRiskEngine())
 
 
 def build_demo_loan_advisory_service(

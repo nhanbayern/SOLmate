@@ -1,337 +1,109 @@
-# Vietnamese Loan Advisory RAG Skeleton
+# Vietnamese Loan Risk Review
 
-Project skeleton for a hybrid Retrieval-Augmented Generation (RAG) system focused on Vietnamese loan advisory.
-The structure is aligned to this concrete stack:
+This project now supports a risk-only review flow for Vietnamese business loan screening.
 
-- LLM: `Qwen`
-- Dense embedding: `bkai-foundation-models/vietnamese-bi-encoder`
-- Vector database: `Milvus`
-- Preprocessing: section-aware chunking, overlap chunking, RDR word segmentation
+The current flow:
 
-## Structure
+1. Receive a direct `EnterpriseCICMetrics` payload from the client.
+2. Load reference rules from:
+   - `dataset/credit_score_rules.json`
+   - `dataset/cic_metrics_spec.json`
+3. Evaluate the case with `LoanRiskEngine`.
+4. Review whether the provided `risk_class` and `risk_probability` are reasonable.
+5. Return a compact explanation with the main risk signals.
 
-```text
-.
-|-- app/
-|   |-- core/
-|   |-- embeddings/
-|   |-- ingestion/
-|   |-- llm/
-|   |-- preprocessing/
-|   |-- retrieval/
-|   |-- schemas/
-|   |-- services/
-|   |-- utils/
-|   |-- vectorstores/
-|   |-- config.py
-|   `-- pipeline.py
-|-- tests/
-|-- main.py
-`-- requirements.txt
+## Input shape
+
+The API accepts a payload like this:
+
+```json
+{
+  "customer_id": "CUST_70314034",
+  "credit_score": 342.61,
+  "metrics": {
+    "Revenue_mean_30d": 2939981.5951350383,
+    "Revenue_mean_90d": 4120090.034469776,
+    "Txn_frequency": 16.86872411150142,
+    "regime": "HIGH_RISK",
+    "Growth_value": -0.2864278279022144,
+    "Growth_score": 0.3567860860488928,
+    "CV_value": 0.5901900337623234,
+    "CV_score": 0,
+    "Spike_ratio": 2.202300634970376,
+    "Spike_score": 0,
+    "Txn_freq_score": 0.6560667393791124,
+    "Years_score": 0.2426819015442752,
+    "Industry_score": 0.7711962577582611
+  },
+  "risk_class": "LOW",
+  "risk_probability": 0.3584073061206929
+}
 ```
 
-## Pipeline
+You can optionally include:
 
-1. Build an advisory query from enterprise profile, score rules, and CIC metrics.
-2. Segment Vietnamese text with RDR-compatible word segmentation.
-3. Build a dense retrieval view for the BKAI encoder.
-4. Chunk legal articles by section first, otherwise use overlap chunking under 256 tokens.
-5. Store chunk text, dense vectors, and metadata in Milvus.
-6. Retrieve dense candidates from Milvus.
-7. Group chunks back to original legal articles.
-8. Generate a loan advisory report using the risk assessment and retrieved legal basis.
-
-## Run
-
-```bash
-python main.py
+```json
+{
+  "dataset_dir": "dataset"
+}
 ```
 
-Run the API locally:
+## API
+
+Start the API:
 
 ```bash
 uvicorn app.api:app --host 0.0.0.0 --port 8000
 ```
 
-## Docker
-
-Build the app image:
-
-```bash
-docker compose build app
-```
-
-Start the Milvus stack:
-
-```bash
-docker compose --profile milvus up -d
-```
-
-Ingest legal data into Milvus:
-
-```bash
-docker compose run --rm app python -m app.ingestion.milvus_ingest --dataset dataset/vietnamese-bank-legal.json --drop-existing
-```
-
-Start the API server:
-
-```bash
-docker compose up app
-```
-
-Check health:
+Health check:
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-Call the advisory API with Milvus dense-only retrieval:
+Risk review:
 
 ```bash
-curl -X POST http://localhost:8000/advisory \
+curl -X POST http://localhost:8000/risk-review \
   -H "Content-Type: application/json" \
-  -d "{\"mode\":\"milvus-dense\",\"customer_id\":\"CUST_70314034\"}"
+  -d "{\"customer_id\":\"CUST_70314034\",\"credit_score\":342.61,\"metrics\":{\"Revenue_mean_30d\":2939981.5951350383,\"Revenue_mean_90d\":4120090.034469776,\"Txn_frequency\":16.86872411150142,\"regime\":\"HIGH_RISK\",\"Growth_value\":-0.2864278279022144,\"Growth_score\":0.3567860860488928,\"CV_value\":0.5901900337623234,\"CV_score\":0,\"Spike_ratio\":2.202300634970376,\"Spike_score\":0,\"Txn_freq_score\":0.6560667393791124,\"Years_score\":0.2426819015442752,\"Industry_score\":0.7711962577582611},\"risk_class\":\"LOW\",\"risk_probability\":0.3584073061206929}"
 ```
 
-Call the advisory API in demo mode:
-
-```bash
-curl -X POST http://localhost:8000/advisory \
-  -H "Content-Type: application/json" \
-  -d "{\"mode\":\"demo\",\"customer_id\":\"CUST_70314034\"}"
-```
-
-Notes:
-
-- The `app` container now serves a FastAPI application on port `8000`.
-- `mode=demo` uses the in-memory demo pipeline.
-- `mode=milvus-dense` uses Milvus retrieval with dense-only search.
-- `customer_id` is optional. If omitted, the first record in the dataset is used.
-- `dataset_dir` can be sent in the request body if you want to read from a different dataset directory.
-- `MILVUS_URI` is read from environment variables, so the app can talk to `milvus-standalone` inside Docker Compose.
-- Re-run the ingest command with `--drop-existing` whenever you want to recreate the collection.
-- The first run may take longer because the Qwen model and embedding model may need to be downloaded.
-
-Response shape:
+Example response shape:
 
 ```json
 {
   "customer_id": "CUST_70314034",
-  "mode": "milvus-dense",
-  "report_text": "...",
-  "recommendation": "...",
-  "summary": "..."
+  "provided_risk_class": "LOW",
+  "expected_risk_class": "POOR",
+  "provided_risk_probability": 0.3584,
+  "expected_risk_probability": 0.8045,
+  "expected_probability_band": "0.60-0.85",
+  "risk_class_is_reasonable": false,
+  "risk_probability_is_reasonable": false,
+  "recommendation": "MANUAL_REVIEW",
+  "summary": "...",
+  "findings": ["..."],
+  "report_text": "..."
 }
 ```
 
+## CLI
 
-## Pipeline
-                    +------------------+
-                    | CLI / FastAPI    |
-                    | main.py / api.py |
-                    +---------+--------+
-                              |
-                              v
-                 +------------+-------------+
-                 | load_loan_advisory_payload|
-                 | app/pipeline.py           |
-                 +------------+-------------+
-                              |
-      +-----------------------+------------------------+
-      |                        |                        |
-      v                        v                        v
-+-------------+       +----------------+      +----------------------+
-|Enterprise   |       |CreditScoreRule |      |EnterpriseCICMetrics  |
-|Profile      |       |list            |      |+ CICMetricSpec list  |
-+------+------+       +--------+-------+      +----------+-----------+
-       \                        |                         /
-        \                       |                        /
-         \                      |                       /
-          +---------------------+----------------------+
-                                |
-                                v
-                  +-------------+-------------+
-                  | LoanAdvisoryService.run() |
-                  +-------------+-------------+
-                                |
-                                v
-                  +-------------+-------------+
-                  | LoanRiskEngine.evaluate() |
-                  +-------------+-------------+
-                                |
-                                v
-                  +---------------------------+
-                  | RiskAssessmentResult       |
-                  | - matched_rule             |
-                  | - risk_class               |
-                  | - recommendation           |
-                  | - summary                  |
-                  | - top_risk_factors         |
-                  | - advisory_query           |
-                  +-------------+-------------+
-                                |
-                                v
-                  +-------------+-------------+
-                  | Query Rewriter            |
-                  | Mock / Qwen               |
-                  +-------------+-------------+
-                                |
-                                v
-                  +-------------+-------------+
-                  | Query Preprocessor        |
-                  | - segment                 |
-                  | - remove stopwords(BM25)  |
-                  | - trim / split query      |
-                  +-------------+-------------+
-                                |
-                                v
-                  +---------------------------+
-                  | QueryVariant              |
-                  | - original_text           |
-                  | - rewritten_text          |
-                  | - bm25_text               |
-                  | - dense_text              |
-                  | - retrieval_units         |
-                  +-------------+-------------+
-                                |
-                                v
-                  +-------------+-------------+
-                  | Retriever                 |
-                  | demo: BM25 + Dense mock   |
-                  | prod: Milvus dense search |
-                  +-------------+-------------+
-                                |
-                                v
-                  +---------------------------+
-                  | list[RetrievalResult]     |
-                  | = ranked legal chunks     |
-                  +-------------+-------------+
-                                |
-                                v
-                  +-------------+-------------+
-                  | ArticleMapper             |
-                  | chunk -> legal article    |
-                  +-------------+-------------+
-                                |
-                                v
-                  +---------------------------+
-                  | list[LegalArticle]        |
-                  | top_k_articles            |
-                  +-------------+-------------+
-                                |
-                                v
-                  +-------------+-------------+
-                  | Advisory Generator        |
-                  | Mock / Qwen               |
-                  +-------------+-------------+
-                                |
-                                v
-                  +---------------------------+
-                  | AdvisoryReport            |
-                  | - recommendation          |
-                  | - summary                 |
-                  | - legal_basis             |
-                  | - suggested_actions       |
-                  | - report_text             |
-                  +-------------+-------------+
-                                |
-                                v
-                  +---------------------------+
-                  | LoanAdvisoryResult        |
-                  | output nội bộ đầy đủ      |
-                  +-------------+-------------+
-                                |
-               +----------------+----------------+
-               |                                 |
-               v                                 v
-    +-----------------------+         +----------------------------+
-    | CLI output            |         | API response               |
-    | report.report_text    |         | customer_id, mode,         |
-    |                       |         | report_text,               |
-    |                       |         | recommendation, summary    |
-    +-----------------------+         +----------------------------+
+Run the same review from the command line:
 
+```bash
+python main.py --mode risk-review --input-file sample.json
+```
 
-## Sơ Đồ Chi Tiết Phần Retrieval
-advisory_query
-    |
-    v
-rewritten_query
-    |
-    v
-QueryVariant
-    |
-    +--> bm25_text -----------+
-    |                         |
-    +--> dense_text           |
-    |                         v
-    +--> retrieval_units --> Dense Embedder --> Milvus Search --> dense hits
-                             
-demo mode:
-bm25_text --> MockBM25
-dense_text -> MockDense
-MockBM25 + MockDense --> normalize score --> weighted merge
+Where `sample.json` contains the same direct CIC payload as above.
 
-prod mode:
-retrieval_units -> BKAI encoder -> vector -> Milvus
-Milvus hits -> normalize dense score -> rank
+## Notes
 
-ranked chunks
-    |
-    v
-deduplicate by article_id
-    |
-    v
-top legal articles for report generation
-
-
-
-## Pipeline Ingestion Vào Milvus
-vietnamese-bank-legal.json
-            |
-            v
-+---------------------------+
-| JSONDataLoader            |
-| load_legal_articles()     |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| list[LegalArticle]        |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| LegalTextChunker          |
-| - section chunking        |
-| - overlap chunking        |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| list[LegalChunk]          |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| ChunkPreprocessor         |
-| - segment                 |
-| - dense_text              |
-| - bm25_text               |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| BKAI Bi-Encoder           |
-| dense vector              |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| Milvus Collection         |
-| - chunk_id                |
-| - article_id              |
-| - dense_text              |
-| - dense_vector            |
-| - metadata                |
-+---------------------------+
+- The risk review path does not depend on `enterprise_cic_metrics.json`.
+- The review compares the provided label/probability against:
+  - the matched credit score rule
+  - the severity of the CIC metrics
+  - the `regime` signal when present
+- Legal retrieval files remain in the repository, but they are not required for the new `risk-review` flow.

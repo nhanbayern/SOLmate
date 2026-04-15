@@ -5,9 +5,10 @@ from app.schemas.loan_models import (
     EnterpriseProfile,
     RiskAssessmentResult,
     RiskFactor,
+    RiskReasonablenessReview,
 )
 
-# Đánh giá rủi ro, kết luận risk ban đầu dựa trên profile doanh nghiệp, điểm tín dụng và các chỉ số CIC khác.
+
 class LoanRiskEngine:
     def evaluate(
         self,
@@ -16,25 +17,19 @@ class LoanRiskEngine:
         cic_metric_specs: list[CICMetricSpec],
         enterprise_cic_metrics: EnterpriseCICMetrics,
     ) -> RiskAssessmentResult:
-        #Chuẩn hóa nhãn risk_class từ CIC để dễ dàng đối chiếu và đưa ra kết luận
         normalized_risk_class = self._normalize_risk_class(enterprise_cic_metrics.risk_class)
-        # Đối chiếu credit_score với các rule của credit_score
         matched_rule = self._match_credit_rule(
             enterprise_cic_metrics.credit_score,
             credit_score_rules,
         )
-        
         metric_insights = self._build_metric_insights(
             enterprise_cic_metrics.metrics,
             cic_metric_specs,
         )
-        
-        #Nếu có probability do CIC cung cấp thì dùng luôn, nếu không có thì suy ra từ risk_class
         risk_probability = self._derive_risk_probability(
             normalized_risk_class,
             enterprise_cic_metrics.risk_probability,
         )
-        
         top_risk_factors = self._derive_top_risk_factors(
             enterprise_cic_metrics=enterprise_cic_metrics,
             metric_insights=metric_insights,
@@ -45,10 +40,10 @@ class LoanRiskEngine:
             risk_probability=risk_probability,
         )
         summary = (
-            f"Doanh nghiệp {enterprise_profile.customer_id} hoạt động trong ngành "
-            f"{enterprise_profile.industry or 'chưa biết hoạt động trong ngành nào'}, credit score "
-            f"{enterprise_cic_metrics.credit_score:.2f}, thuộc mục {matched_rule.level}, "
-            f"rủi ro mô hình {normalized_risk_class} ({risk_probability:.2f})."
+            f"Doanh nghiep {enterprise_profile.customer_id} hoat dong trong nganh "
+            f"{enterprise_profile.industry or 'chua ro'}, credit score "
+            f"{enterprise_cic_metrics.credit_score:.2f}, thuoc muc {matched_rule.level}, "
+            f"rui ro mo hinh {normalized_risk_class} ({risk_probability:.2f})."
         )
         advisory_query = self._build_advisory_query(
             enterprise_profile=enterprise_profile,
@@ -69,6 +64,83 @@ class LoanRiskEngine:
             metric_insights=metric_insights,
             top_risk_factors=top_risk_factors,
             advisory_query=advisory_query,
+        )
+
+    def review_reasonableness(
+        self,
+        credit_score_rules: list[CreditScoreRule],
+        enterprise_cic_metrics: EnterpriseCICMetrics,
+        risk_assessment: RiskAssessmentResult,
+    ) -> RiskReasonablenessReview:
+        provided_risk_class = self._normalize_risk_class(enterprise_cic_metrics.risk_class)
+        regime = str(enterprise_cic_metrics.metrics.get("regime", "")).upper().strip()
+        top_severities = sorted(
+            [
+                self._metric_severity(metric_name, metric_value)
+                for metric_name, metric_value in enterprise_cic_metrics.metrics.items()
+                if self._metric_severity(metric_name, metric_value) > 0
+            ],
+            reverse=True,
+        )[:5]
+
+        if regime == "HIGH_RISK":
+            top_severities.append(1.0)
+        elif regime == "NORMAL":
+            top_severities.append(0.4)
+        elif regime == "LOW_RISK":
+            top_severities.append(0.0)
+
+        metric_signal = (sum(top_severities) / len(top_severities)) if top_severities else 0.0
+        matched_rule = self._match_credit_rule(
+            enterprise_cic_metrics.credit_score,
+            credit_score_rules,
+        )
+        credit_anchor = self._credit_rule_probability_anchor(matched_rule.level)
+        metric_anchor = 0.15 + (0.75 * metric_signal)
+
+        if regime == "HIGH_RISK":
+            metric_anchor = max(metric_anchor, 0.75)
+        elif regime == "LOW_RISK":
+            metric_anchor = min(metric_anchor, 0.35)
+
+        expected_probability = round((0.65 * credit_anchor) + (0.35 * metric_anchor), 4)
+        expected_risk_class = self._probability_to_risk_class(expected_probability)
+        probability_band = self._probability_band(expected_risk_class)
+        probability_is_reasonable = (
+            probability_band[0] <= enterprise_cic_metrics.risk_probability <= probability_band[1]
+        )
+
+        findings = [
+            (
+                f"Credit score {enterprise_cic_metrics.credit_score:.2f} nam trong rule "
+                f"{matched_rule.level} ({matched_rule.decision})."
+            )
+        ]
+        if regime:
+            findings.append(f"Metric 'regime' dang o muc {regime}.")
+
+        for factor in risk_assessment.top_risk_factors[:4]:
+            findings.append(f"{factor.name}={factor.value}: {factor.note}")
+
+        if provided_risk_class != expected_risk_class:
+            findings.append(
+                f"Nhan dau vao la {provided_risk_class} nhung tong hop tin hieu nghieng ve {expected_risk_class}."
+            )
+        if not probability_is_reasonable:
+            findings.append(
+                f"Xac suat {enterprise_cic_metrics.risk_probability:.4f} lech vung ky vong "
+                f"{probability_band[0]:.2f}-{probability_band[1]:.2f}."
+            )
+
+        return RiskReasonablenessReview(
+            provided_risk_class=provided_risk_class,
+            expected_risk_class=expected_risk_class,
+            provided_risk_probability=round(enterprise_cic_metrics.risk_probability, 4),
+            expected_risk_probability=expected_probability,
+            expected_probability_band=self._format_probability_band(probability_band),
+            risk_class_is_reasonable=provided_risk_class == expected_risk_class,
+            risk_probability_is_reasonable=probability_is_reasonable,
+            findings=findings,
         )
 
     def _normalize_risk_class(self, risk_class: str) -> str:
@@ -118,14 +190,14 @@ class LoanRiskEngine:
 
     def _build_metric_insights(
         self,
-        metrics: dict[str, str |float],
+        metrics: dict[str, str | float],
         cic_metric_specs: list[CICMetricSpec],
     ) -> list[RiskFactor]:
         spec_map = {item.metrics: item for item in cic_metric_specs}
         insights: list[RiskFactor] = []
         for metric_name, metric_value in metrics.items():
             spec = spec_map.get(metric_name)
-            note = "Không có mô tả metrics."
+            note = "Khong co mo ta metrics."
             if spec is not None:
                 note_parts = [part for part in [spec.note, spec.value] if part]
                 note = " ".join(note_parts).strip()
@@ -160,7 +232,10 @@ class LoanRiskEngine:
                     RiskFactor(
                         name=metric_name,
                         value=str(metric_value),
-                        note=insight_map.get(metric_name, RiskFactor(name=metric_name, value=str(metric_value))).note,
+                        note=insight_map.get(
+                            metric_name,
+                            RiskFactor(name=metric_name, value=str(metric_value)),
+                        ).note,
                     ),
                 )
             )
@@ -263,14 +338,51 @@ class LoanRiskEngine:
         metric_insights: list[RiskFactor],
         top_risk_factors: list[RiskFactor],
     ) -> str:
-        years_text = str(enterprise_profile.years_in_business or "không rõ")
-        focus_metrics = ", ".join(item.name for item in top_risk_factors[:4]) or ", ".join(item.name for item in metric_insights[:4])
-        return (
-            "quy định cấp tín dụng cho doanh nghiệp, điều kiện thẩm định hồ sơ vay, "
-            f"doanh nghiệp ngành {enterprise_profile.industry or 'không rõ'}, "
-            f"loại hình {enterprise_profile.business_type or 'không rõ'}, "
-            f"số năm hoạt động là {years_text}, "
-            f"credit score mức {matched_rule.level}, "
-            f"risk class {risk_class}, "
-            f"các chỉ số CIC cần lưu ý là: {focus_metrics}"
+        years_text = str(enterprise_profile.years_in_business or "khong ro")
+        focus_metrics = ", ".join(item.name for item in top_risk_factors[:4]) or ", ".join(
+            item.name for item in metric_insights[:4]
         )
+        return (
+            "quy dinh cap tin dung cho doanh nghiep, dieu kien tham dinh ho so vay, "
+            f"doanh nghiep nganh {enterprise_profile.industry or 'khong ro'}, "
+            f"loai hinh {enterprise_profile.business_type or 'khong ro'}, "
+            f"so nam hoat dong la {years_text}, "
+            f"credit score muc {matched_rule.level}, "
+            f"risk class {risk_class}, "
+            f"cac chi so CIC can luu y la: {focus_metrics}"
+        )
+
+    def _credit_rule_probability_anchor(self, matched_level: str) -> float:
+        anchors = {
+            "VERY_GOOD": 0.15,
+            "GOOD": 0.30,
+            "AVERAGE": 0.55,
+            "POOR": 0.78,
+            "VERY_POOR": 0.92,
+            "UNKNOWN": 0.50,
+        }
+        return anchors.get(matched_level.upper().strip(), 0.50)
+
+    def _probability_to_risk_class(self, probability: float) -> str:
+        if probability < 0.20:
+            return "VERY_LOW"
+        if probability < 0.40:
+            return "LOW"
+        if probability < 0.60:
+            return "MEDIUM"
+        if probability < 0.85:
+            return "POOR"
+        return "VERY_POOR"
+
+    def _probability_band(self, risk_class: str) -> tuple[float, float]:
+        bands = {
+            "VERY_LOW": (0.00, 0.20),
+            "LOW": (0.20, 0.40),
+            "MEDIUM": (0.40, 0.60),
+            "POOR": (0.60, 0.85),
+            "VERY_POOR": (0.85, 1.00),
+        }
+        return bands.get(risk_class, (0.00, 1.00))
+
+    def _format_probability_band(self, band: tuple[float, float]) -> str:
+        return f"{band[0]:.2f}-{band[1]:.2f}"

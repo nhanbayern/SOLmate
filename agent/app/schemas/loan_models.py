@@ -58,6 +58,23 @@ class RiskAssessmentResult(BaseModel):
     advisory_query: str #Đây là truy vấn được tạo ra từ kết quả đánh giá rủi ro để đi tìm căn cứ pháp lý và nội dung tư vấn tiếp theo
 
 # Là báo cáo tư vấn được viết ra sau khi hệ thống tra cứu tài liệu pháp lý
+class RiskReasonablenessReview(BaseModel):
+    provided_risk_class: str
+    expected_risk_class: str
+    provided_risk_probability: float
+    expected_risk_probability: float
+    expected_probability_band: str
+    risk_class_is_reasonable: bool
+    risk_probability_is_reasonable: bool
+    findings: list[str] = Field(default_factory=list)
+
+
+class RiskReviewResult(BaseModel):
+    risk_assessment: RiskAssessmentResult
+    review: RiskReasonablenessReview
+    report_text: str
+
+
 class AdvisoryReport(BaseModel):
     recommendation: str
     summary: str
