@@ -5,3 +5,8 @@ type EvaluateLoanRequest struct {
 	MerchantID string `json:"merchant_id" binding:"required"`
 	CustomerID string `json:"customer_id" binding:"required"`
 }
+
+type LoginRequest struct {
+	UserID   string `json:"user_id"`
+	Password string `json:"password"`
+}

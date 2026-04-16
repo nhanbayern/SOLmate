@@ -41,8 +41,10 @@ func run() error {
 	closer.Add(rdb.Close)
 
 	pgRepo := repositories.NewPostgresRepo(pgDB)
+	userRepo := repositories.NewUserRepo(pgDB)
 	redisRepo := repositories.NewRedisRepo(rdb)
 	agentService := services.NewAgentService(cfg.ToAgentServiceConfig())
+	authService := services.NewAuthService(userRepo, cfg.ToAuthServiceConfig())
 
 	dllPath := "./ai_models/onnxruntime.dll"
 	modelPath := "./ai_models/XGBoost.onnx"
@@ -54,6 +56,7 @@ func run() error {
 
 	httpHandler := handlers.NewHTTPHandler(loanService)
 	sseHandler := handlers.NewSSEHandler(rdb)
+	authHandler := handlers.NewAuthHandler(authService)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -77,8 +80,18 @@ func run() error {
 		})
 	})
 
-	r.POST("api/loans/evaluate", httpHandler.EvaluateLoan)
-	r.GET("api/loans/stream", sseHandler.SubscribeToMerchantStatus)
+	auth := r.Group("/api/auth")
+	{
+		auth.POST("/login", authHandler.Login)
+		auth.GET("/me", authHandler.AuthMiddleware(), authHandler.Me)
+	}
+
+	api := r.Group("/api")
+	api.Use(authHandler.AuthMiddleware())
+	{
+		api.POST("/loans/evaluate", httpHandler.EvaluateLoan)
+		api.GET("/loans/stream", sseHandler.SubscribeToMerchantStatus)
+	}
 
 	srv := &http.Server{
 		Addr:         cfg.ServerPort,

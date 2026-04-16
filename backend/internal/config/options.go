@@ -58,3 +58,9 @@ type AgentServiceConfig struct {
 	AgentURL string
 	Timeout  time.Duration
 }
+
+type AuthServiceConfig struct {
+	JWTSecret     string
+	JWTExpiration time.Duration
+	DBTimeout     time.Duration
+}

@@ -38,7 +38,24 @@ CREATE TABLE IF NOT EXISTS loan_requests (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS users (
+  user_id VARCHAR(50) PRIMARY KEY,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'BANKER',
+  merchant_id VARCHAR(50) REFERENCES merchants(id) ON DELETE SET NULL,
+  customer_id VARCHAR(50) DEFAULT NULL,
+  status VARCHAR(20) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO users (user_id, username, password_hash, role) 
+VALUES ('usr_admin_001', 'admin', '$2a$10$LfWS4Z9GoVXYIfbigm8bKOlikiFKsOj8FuczU.5.K2h/isbLUo016', 'ADMIN')
+ON CONFLICT (username) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_transactions_merchant_id ON transaction_logs(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_history ON transaction_logs(merchant_id, customer_id, transaction_time);
 CREATE INDEX IF NOT EXISTS idx_loans_merchant_id ON loan_requests(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_loans_customer_id ON loan_requests(customer_id);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);

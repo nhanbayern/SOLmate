@@ -54,6 +54,9 @@ type Config struct {
 	LoanLowThreshold      float64
 
 	AgentTimeout time.Duration
+
+	JWTSecret     string
+	JWTExpiration time.Duration
 }
 
 func getEnv(key, fallback string) string {
@@ -125,6 +128,9 @@ func LoadConfig() *Config {
 		LoanLowThreshold:      LoanLowThreshold,
 
 		AgentTimeout: AgentTimeout,
+
+		JWTSecret:     getEnv("JWT_SECRET", "super-secret-solmate-key"),
+		JWTExpiration: 24 * time.Hour,
 	}
 
 	slog.Info(
@@ -207,5 +213,12 @@ func (c *Config) ToAgentServiceConfig() AgentServiceConfig {
 	return AgentServiceConfig{
 		AgentURL: c.AgentURL,
 		Timeout:  c.AgentTimeout,
+	}
+}
+func (c *Config) ToAuthServiceConfig() AuthServiceConfig {
+	return AuthServiceConfig{
+		JWTSecret:     c.JWTSecret,
+		JWTExpiration: c.JWTExpiration,
+		DBTimeout:     c.DBTimeout,
 	}
 }
