@@ -86,7 +86,7 @@ class LoanRiskEngine:
             enterprise_cic_metrics.credit_score,
             credit_score_rules,
         )
-        credit_anchor = self._credit_rule_probability_anchor(matched_rule.level)
+        credit_anchor = self._credit_rule_probability_anchor(matched_rule.risk)
         metric_anchor = 0.15 + (0.75 * metric_signal)
 
         if regime == "HIGH_RISK":
@@ -144,9 +144,14 @@ class LoanRiskEngine:
         normalized = risk_class.upper().strip()
         if normalized.endswith("_RISK"):
             normalized = normalized.removesuffix("_RISK")
-        if normalized == "AVERAGE":
-            return "MEDIUM"
-        return normalized
+        alias_map = {
+            "VERY_GOOD": "VERY_LOW",
+            "GOOD": "LOW",
+            "AVERAGE": "MEDIUM",
+            "POOR": "HIGH",
+            "VERY_POOR": "VERY_HIGH",
+        }
+        return alias_map.get(normalized, normalized)
 
     def _derive_risk_probability(
         self,
@@ -157,13 +162,11 @@ class LoanRiskEngine:
             return provided_probability
 
         fallback_map = {
-            "VERY_GOOD": 0.15,
             "VERY_LOW": 0.18,
-            "GOOD": 0.28,
             "LOW": 0.32,
             "MEDIUM": 0.55,
-            "POOR": 0.78,
-            "VERY_POOR": 0.92,
+            "HIGH": 0.78,
+            "VERY_HIGH": 0.92,
         }
         return fallback_map.get(risk_class, 0.50)
 
@@ -305,21 +308,21 @@ class LoanRiskEngine:
         risk_class: str,
         risk_probability: float,
     ) -> str:
-        safe_classes = {"VERY_LOW", "LOW", "GOOD", "VERY_GOOD"}
+        safe_classes = {"VERY_LOW", "LOW"}
 
-        if matched_rule.decision == "REJECT" or risk_class == "VERY_POOR":
+        if matched_rule.decision == "REJECT" or risk_class == "VERY_HIGH":
             return "REJECT"
         if matched_rule.decision == "LIKELY_REJECT":
             if risk_class in safe_classes:
                 return "MANUAL_REVIEW"
             return "REJECT"
-        if risk_class == "POOR" and risk_probability >= 0.70:
+        if risk_class == "HIGH" and risk_probability >= 0.70:
             return "REJECT"
         if matched_rule.decision == "REVIEW_REQUIRED":
             if risk_class in safe_classes and risk_probability < 0.40:
                 return "APPROVE_WITH_CONDITIONS"
             return "MANUAL_REVIEW"
-        if risk_class in {"POOR", "MEDIUM"}:
+        if risk_class in {"HIGH", "MEDIUM"}:
             return "MANUAL_REVIEW"
         if matched_rule.decision == "APPROVE_EASILY" and risk_class in safe_classes and risk_probability < 0.35:
             return "APPROVE"
@@ -327,16 +330,16 @@ class LoanRiskEngine:
             return "APPROVE_WITH_CONDITIONS"
         return "MANUAL_REVIEW"
 
-    def _credit_rule_probability_anchor(self, matched_level: str) -> float:
+    def _credit_rule_probability_anchor(self, matched_risk: str) -> float:
         anchors = {
-            "VERY_GOOD": 0.15,
-            "GOOD": 0.30,
-            "AVERAGE": 0.55,
-            "POOR": 0.78,
-            "VERY_POOR": 0.92,
+            "VERY_LOW": 0.15,
+            "LOW": 0.30,
+            "MEDIUM": 0.55,
+            "HIGH": 0.78,
+            "VERY_HIGH": 0.92,
             "UNKNOWN": 0.50,
         }
-        return anchors.get(matched_level.upper().strip(), 0.50)
+        return anchors.get(matched_risk.upper().strip(), 0.50)
 
     def _probability_to_risk_class(self, probability: float) -> str:
         if probability < 0.20:
@@ -346,16 +349,16 @@ class LoanRiskEngine:
         if probability < 0.60:
             return "MEDIUM"
         if probability < 0.85:
-            return "POOR"
-        return "VERY_POOR"
+            return "HIGH"
+        return "VERY_HIGH"
 
     def _probability_band(self, risk_class: str) -> tuple[float, float]:
         bands = {
             "VERY_LOW": (0.00, 0.20),
             "LOW": (0.20, 0.40),
             "MEDIUM": (0.40, 0.60),
-            "POOR": (0.60, 0.85),
-            "VERY_POOR": (0.85, 1.00),
+            "HIGH": (0.60, 0.85),
+            "VERY_HIGH": (0.85, 1.00),
         }
         return bands.get(risk_class, (0.00, 1.00))
 

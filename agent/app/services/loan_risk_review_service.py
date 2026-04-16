@@ -1,3 +1,5 @@
+import pandas as pd
+
 from app.core.prompts import RISK_REVIEW_REPORT_TEMPLATE, RISK_REVIEW_USER_REPORT_TEMPLATE
 from app.schemas.loan_models import (
     CICMetricSpec,
@@ -6,6 +8,7 @@ from app.schemas.loan_models import (
     EnterpriseProfile,
     RiskReviewResult,
 )
+from app.services.credit_limits import calculate_credit_limit, get_coefficient_note
 
 
 class LoanRiskReviewService:
@@ -42,6 +45,10 @@ class LoanRiskReviewService:
             risk_assessment=risk_assessment,
             review=review,
         )
+        risk_class_review = self._build_risk_class_review(
+            risk_assessment=risk_assessment,
+            review=review,
+        )
         user_enterprise_overview = self._build_user_enterprise_overview(profile)
         business_status = self._build_user_business_status(
             risk_assessment=risk_assessment,
@@ -51,6 +58,7 @@ class LoanRiskReviewService:
         bank_advice = self._build_bank_advice(
             risk_assessment=risk_assessment,
             review=review,
+            enterprise_cic_metrics=enterprise_cic_metrics,
         )
         user_advice = self._build_user_advice(
             enterprise_profile=profile,
@@ -64,7 +72,7 @@ class LoanRiskReviewService:
         )
         report_text_bank = self._compose_bank_report_text(
             enterprise_overview=enterprise_overview,
-            risk_class_review=self._build_risk_class_review(risk_assessment, review),
+            risk_class_review=risk_class_review,
             current_overview=current_overview,
             bank_advice=bank_advice,
             next_actions=next_actions,
@@ -140,22 +148,27 @@ class LoanRiskReviewService:
         factor_summary = ", ".join(
             f"{factor.name}={factor.value}" for factor in risk_assessment.top_risk_factors[:4]
         ) or "chưa xác định được metric nổi bật"
+        if review.risk_class_is_reasonable:
+            alignment_text = "Nhãn đầu vào nhìn chung phù hợp với nhóm tín hiệu hiện tại. "
+        else:
+            alignment_text = "Nhãn đầu vào đang có xu hướng thấp hơn mức rủi ro phản ánh từ tín hiệu hiện tại. "
         return (
-            f"Tín hiệu hiện tại cho thấy doanh nghiệp đang nằm ở nhóm {review.expected_risk_class}, "
-            f"nghiêng về mức rủi ro cao hơn nhãn đầu vào. Credit score khớp rule {risk_assessment.matched_rule.level}, "
+            f"Tín hiệu hiện tại cho thấy doanh nghiệp đang nằm ở nhóm {review.expected_risk_class}. "
+            f"{alignment_text}Credit score khớp rule {risk_assessment.matched_rule.level}, "
             f"trong khi các metric nổi bật gồm {factor_summary} cho thấy khả năng biến động dòng tiền "
             f"và độ ổn định hoạt động đang là điểm cần theo dõi sát."
         )
 
     def _build_user_business_status(self, risk_assessment, review) -> str:
-        level = risk_assessment.matched_rule.level.upper()
+        risk_class = review.expected_risk_class.upper()
         level_map = {
+            "VERY_LOW": "mức rủi ro rất thấp",
             "LOW": "mức rủi ro thấp",
             "MEDIUM": "mức rủi ro trung bình",
             "HIGH": "mức rủi ro cao",
-            "POOR": "mức rủi ro tương đối cao",
+            "VERY_HIGH": "mức rủi ro rất cao",
         }
-        level_text = level_map.get(level, "mức độ cần theo dõi thêm")
+        level_text = level_map.get(risk_class, "mức độ cần theo dõi thêm")
 
         recommendation = review.reviewed_recommendation
         if recommendation == "APPROVE":
@@ -178,7 +191,7 @@ class LoanRiskReviewService:
             "Tại thời điểm này, tình trạng hồ sơ chưa thuận lợi cho việc cấp tín dụng."
         )
 
-    def _build_bank_advice(self, risk_assessment, review) -> str:
+    def _build_bank_advice(self, risk_assessment, review, enterprise_cic_metrics: EnterpriseCICMetrics) -> str:
         recommendation = review.reviewed_recommendation
         advice_map = {
             "APPROVE": "Có thể xem xét cho vay theo quy trình thông thường, nhưng vẫn cần kiểm tra tính đầy đủ của hồ sơ.",
@@ -186,13 +199,71 @@ class LoanRiskReviewService:
             "MANUAL_REVIEW": "Chưa nên phê duyệt ngay. Nên chuyển thẩm định thủ công, bổ sung tài liệu tài chính và kiểm tra thêm khả năng trả nợ trước khi quyết định cho vay.",
             "REJECT": "Không nên phê duyệt cho vay ở thời điểm hiện tại, trừ khi doanh nghiệp bổ sung được các bằng chứng rất mạnh để đảo ngược các tín hiệu rủi ro.",
         }
+        credit_limit_text = self._build_credit_limit_text(
+            risk_assessment=risk_assessment,
+            review=review,
+            enterprise_cic_metrics=enterprise_cic_metrics,
+        )
         reason = (
             f"Khuyến nghị sau khi review là **{recommendation}**. "
             f"Lý do chính: credit score thuộc mức {risk_assessment.matched_rule.level}, "
             f"risk class hợp lý hơn là {review.expected_risk_class}, "
             f"và xác suất rủi ro kỳ vọng ở mức {review.expected_risk_probability:.4f}."
         )
-        return reason + " " + advice_map.get(recommendation, "")
+        return "\n".join(
+            [
+                reason + " " + advice_map.get(recommendation, ""),
+                credit_limit_text,
+            ]
+        )
+
+    def _build_credit_limit_text(
+        self,
+        risk_assessment,
+        review,
+        enterprise_cic_metrics: EnterpriseCICMetrics,
+    ) -> str:
+        coefficient_set_name = self._select_credit_limit_coefficient_set(review.reviewed_recommendation)
+        customer_data = pd.Series(
+            {
+                **enterprise_cic_metrics.metrics,
+                "default_probability": review.expected_risk_probability,
+                "CIC_SCORE": risk_assessment.credit_score,
+                "label_cic_range": self._map_credit_level_to_cic_range(risk_assessment.matched_rule.level),
+            }
+        )
+        credit_limit = calculate_credit_limit(
+            customer_data=customer_data,
+            coefficient_set_name=coefficient_set_name,
+        )
+        limit_note = get_coefficient_note(coefficient_set_name)
+        return (
+            f"Hạn mức cho vay đề xuất: **{self._format_currency_vnd(credit_limit)}**.\n"
+            f"Ghi chú hạn mức: Tính theo bộ hệ số **{coefficient_set_name}**; {limit_note} "
+            "Kết quả đã được làm tròn xuống đến 100.000.000 VND gần nhất."
+        )
+
+    def _select_credit_limit_coefficient_set(self, recommendation: str) -> str:
+        coefficient_map = {
+            "APPROVE": "Growth-driven",
+            "APPROVE_WITH_CONDITIONS": "Balanced",
+            "MANUAL_REVIEW": "Conservative",
+            "REJECT": "Risk-based",
+        }
+        return coefficient_map.get(recommendation, "Balanced")
+
+    def _map_credit_level_to_cic_range(self, credit_level: str) -> str:
+        level_map = {
+            "VERY_GOOD": "EXCELLENT",
+            "GOOD": "GOOD",
+            "AVERAGE": "FAIR",
+            "LOW": "LOW",
+            "VERY_LOW": "LOW",
+        }
+        return level_map.get(credit_level.upper().strip(), "LOW")
+
+    def _format_currency_vnd(self, amount: int) -> str:
+        return f"{amount:,.0f} VND"
 
     def _build_user_advice(self, enterprise_profile: EnterpriseProfile, risk_assessment, review) -> str:
         recommendation = review.reviewed_recommendation
@@ -265,13 +336,13 @@ class LoanRiskReviewService:
         bank_advice: str,
         next_actions: list[str],
     ) -> str:
-        formatted_actions = "\n".join(f"- {item}" for item in next_actions)
+        next_actions_text = "\n".join(f"- {action}" for action in next_actions)
         return RISK_REVIEW_REPORT_TEMPLATE.format(
             enterprise_overview=enterprise_overview,
             risk_class_review=risk_class_review,
             current_overview=current_overview,
             bank_advice=bank_advice,
-            next_actions=formatted_actions,
+            next_actions=next_actions_text,
         )
 
     def _compose_user_report_text(

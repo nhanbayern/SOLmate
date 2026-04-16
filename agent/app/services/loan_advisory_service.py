@@ -34,6 +34,7 @@ class LoanAdvisoryService:
 
         report: AdvisoryReport = self.advisory_generator.generate(
             enterprise_profile=enterprise_profile,
+            enterprise_cic_metrics=enterprise_cic_metrics,
             risk_assessment=risk_assessment,
         )
 

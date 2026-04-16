@@ -2,66 +2,66 @@
   {
     "metrics": "Revenue_mean_30d",
     "value": "",
-    "note": "Cách sinh dữ liệu: rev_90d được xây dựng từ daily_revenue theo phân phối log-normal. growth_target theo từng regime: HIGH_RISK: [-1.0, -0.05] LOW_RISK: [0.2, 0.95] NORMAL: [-0.2, 0.3]. rev_30d = rev_90d * (1 + growth_target) * uniform(0.97, 1.03), sau đó được giới hạn trong khoảng [500,000, 10,000,000]. Ý nghĩa: doanh thu trung bình ngắn hạn trong 30 ngày."
+    "note": "Doanh thu bình quân ngắn hạn 30 ngày."
   },
   {
     "metrics": "Revenue_mean_90d",
     "value": "",
-    "note": "Cách sinh dữ liệu: daily_revenue ~ LogNormal(log(2,500,000), sigma=0.75), được giới hạn trong khoảng [500,000, 10,000,000]. rev_90d = daily_revenue * uniform(0.85, 1.15), sau đó tiếp tục được giới hạn. Ý nghĩa: doanh thu trung bình nền theo khung thời gian dài hơn, trong 90 ngày."
+    "note": "Doanh thu bình quân nền dài hơn (90 ngày), dùng làm baseline tăng trưởng."
   },
   {
     "metrics": "Txn_frequency",
     "value": "",
-    "note": "Theo từng regime: HIGH_RISK: uniform(5, 30) LOW_RISK: uniform(35, 80) NORMAL: uniform(10, 60), sau đó được giới hạn trong khoảng [5, 80]. Ý nghĩa: tín hiệu về cường độ hoặc mức độ hoạt động giao dịch POS."
+    "note": "Tần suất giao dịch POS; đại diện mức độ hoạt động."
   },
   {
     "metrics": "regime",
     "value": "NORMAL 0.70, HIGH_RISK 0.15, LOW_RISK 0.15.",
-    "note": "Xác suất: NORMAL 0.70, HIGH_RISK 0.15, LOW_RISK 0.15. Ý nghĩa: trạng thái regime tiềm ẩn của doanh nghiệp, chi phối nhiều cơ chế sinh dữ liệu khác nhau."
+    "note": "Biến ẩn mô phỏng bối cảnh kinh doanh; chi phối cách sinh nhiều feature."
   },
   {
     "metrics": "Growth_value",
     "value": "(Revenue_mean_30d - Revenue_mean_90d) / Revenue_mean_90d, clipped to [-1, 1].",
-    "note": "Công thức: (Revenue_mean_30d - Revenue_mean_90d) / Revenue_mean_90d, được giới hạn trong khoảng [-1, 1]. Ý nghĩa: tín hiệu tăng trưởng doanh thu thực tế ở dạng thô."
+    "note": "Tăng trưởng doanh thu thực (raw growth signal)."
   },
   {
     "metrics": "Growth_score",
     "value": "Growth_score = (Growth_value + 1) / 2.",
-    "note": "Công thức: Growth_score = (Growth_value + 1) / 2. Ý nghĩa: điểm tăng trưởng đã được chuẩn hóa từ khoảng [-1,1] sang [0,1]."
+    "note": "Chuẩn hóa tăng trưởng từ [-1,1] về [0,1]."
   },
   {
     "metrics": "CV_value",
     "value": "",
-    "note": "Cách sinh dữ liệu: giá trị nền theo regime gồm HIGH_RISK: [0.4, 0.8] LOW_RISK: [0.02, 0.15] NORMAL: [0.1, 0.4]. Điều chỉnh theo thời gian hoạt động: <2 năm: +0.03 đến +0.10, >8 năm: -0.01 đến -0.05. Ràng buộc nhất quán: Txn_frequency > 60 -> CV <= 0.25; Txn_frequency < 12 -> CV >= 0.45; các ngành HIGH_RISK/TRADE_RISK -> CV >= 0.30. Ý nghĩa: đại diện cho mức độ biến động dòng tiền, là tín hiệu rủi ro cốt lõi."
+    "note": "Mức biến động dòng tiền (volatility proxy), tín hiệu rủi ro cốt lõi."
   },
   {
     "metrics": "CV_score",
     "value": "CV_score = 1 - min(CV_value / 0.45, 1.0).",
-    "note": "Công thức chính: CV_score = 1 - min(CV_value / 0.45, 1.0). Phạt bổ sung: nếu CV_value > 0.6 thì trừ thêm 0.10 và chặn sàn tại 0. Ý nghĩa: điểm ổn định dòng tiền; CV càng cao thì điểm càng thấp."
+    "note": "Điểm ổn định dòng tiền; CV càng cao thì điểm càng thấp."
   },
   {
     "metrics": "Spike_ratio",
     "value": "",
-    "note": "Theo từng regime: HIGH_RISK: [1.5, 2.5] LOW_RISK: [1.0, 1.2] NORMAL: [1.0, 1.8]. Ràng buộc: nếu Growth_score > 0.7 thì giới hạn spike_ratio ở mức tối đa 1.4. Ý nghĩa: mức độ phụ thuộc vào các đột biến doanh thu."
+    "note": "Mức phụ thuộc vào đột biến doanh thu."
   },
   {
     "metrics": "Spike_score",
     "value": "Spike_score = max(0, 1 - (Spike_ratio - 1.0) / 1.2).",
-    "note": "Công thức: Spike_score = max(0, 1 - (Spike_ratio - 1.0) / 1.2). Ý nghĩa: điểm ổn định theo mức độ đột biến; spike_ratio càng thấp thì điểm càng cao."
+    "note": "Điểm ổn định theo khía cạnh spike; spike_ratio thấp thì điểm cao."
   },
   {
     "metrics": "Txn_freq_score",
     "value": "log(1 + Txn_frequency) / log(81).",
-    "note": "Công thức: log(1 + Txn_frequency) / log(81). Ý nghĩa: điểm tần suất giao dịch được chuẩn hóa theo log trong khoảng [0,1]."
+    "note": "Điểm hóa tần suất giao dịch về [0,1] theo log scale."
   },
   {
     "metrics": "Years_score",
     "value": "Years_score = min(years_in_business / 15, 1.0).",
-    "note": "Công thức: Years_score = min(years_in_business / 15, 1.0). Ý nghĩa: điểm phản ánh mức độ trưởng thành trong quá trình vận hành."
+    "note": "Điểm phản ánh độ trưởng thành vận hành."
   },
   {
     "metrics": "Industry_score",
     "value": "",
-    "note": "Điểm nền theo nhóm ngành: LOW_RISK: 0.93 MEDIUM_RISK: 0.72 SERVICE_RISK: 0.65 TECHNICAL_RISK: 0.65 HIGH_RISK: 0.35 TRADE_RISK: 0.50 ASSET_BASED: 0.80. Sau đó cộng thêm nhiễu đều uniform(-0.05, +0.05), rồi giới hạn trong khoảng [0,1]. Ý nghĩa: điểm rủi ro mang tính cấu trúc của ngành nghề."
+    "note": "Điểm rủi ro cấu trúc theo ngành kinh doanh."
   }
 ]

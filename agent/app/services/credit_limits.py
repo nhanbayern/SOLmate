@@ -51,7 +51,7 @@ def calculate_credit_limit(customer_data: pd.Series, coefficient_set_name: str) 
         raise ValueError(f"Bộ hệ số '{coefficient_set_name}' không tồn tại. Các lựa chọn: {list(COEFFICIENT_SETS.keys())}")
 
     # --- LOGIC MỚI: Thêm hạn mức nền theo nhóm CIC ---
-    cic_range = customer_data.get('label_cic_range', 'Poor').upper() # Lấy nhóm CIC, mặc định là 'POOR'
+    cic_range = customer_data.get('label_cic_range', 'LOW').upper() # Lấy nhóm CIC, mặc định là 'LOW'
     base_limit_mil = 50  # Mức nền tối thiểu là 50 triệu
     if cic_range == 'FAIR':
         base_limit_mil = 100
@@ -59,7 +59,7 @@ def calculate_credit_limit(customer_data: pd.Series, coefficient_set_name: str) 
         base_limit_mil = 150
     elif cic_range == 'EXCELLENT':
         base_limit_mil = 200
-    # 'VERY POOR' và 'POOR' giữ nguyên mức 50 triệu
+    # 'VERY LOW' và 'LOW' giữ nguyên mức 50 triệu
 
     # Lấy bộ hệ số tương ứng
     b = COEFFICIENT_SETS[coefficient_set_name]['coeffs']

@@ -1,10 +1,11 @@
 import re
 
+from app.core.loan_prompt_payload import build_loan_model_input_json
 from app.core.prompts import LOAN_ADVISORY_PROMPT_TEMPLATE
-from app.schemas.loan_models import AdvisoryReport, EnterpriseProfile, RiskAssessmentResult
+from app.schemas.loan_models import AdvisoryReport, EnterpriseCICMetrics, EnterpriseProfile, RiskAssessmentResult
 
 
-_RECOMMENDATION_PATTERN = re.compile(r"(?im)^\s*Quy[ếe]t định:\s*(.+?)\s*$")
+_RECOMMENDATION_PATTERN = re.compile(r"(?im)^\s*(?:Quyết định|Quyet dinh):\s*(.+?)\s*$")
 
 
 def _build_key_reasons(
@@ -12,10 +13,10 @@ def _build_key_reasons(
     risk_assessment: RiskAssessmentResult,
 ) -> list[str]:
     reasons = [
-        f"Credit score {risk_assessment.credit_score:.0f} duoc xep muc {risk_assessment.matched_rule.level}.",
+        f"Credit score {risk_assessment.credit_score:.0f} được xếp mức {risk_assessment.matched_rule.level}.",
         (
-            f"Mo hinh {enterprise_profile.customer_id} du doan nhom rui ro "
-            f"{risk_assessment.risk_class} voi xac suat {risk_assessment.risk_probability:.2f}."
+            f"Mô hình cho khách hàng {enterprise_profile.customer_id} dự đoán nhóm rủi ro "
+            f"{risk_assessment.risk_class} với xác suất {risk_assessment.risk_probability:.2f}."
         ),
     ]
     factors = risk_assessment.top_risk_factors or risk_assessment.metric_insights
@@ -27,20 +28,20 @@ def _build_key_reasons(
 def _build_missing_information(enterprise_profile: EnterpriseProfile) -> list[str]:
     missing_information: list[str] = []
     if not enterprise_profile.merchant_id:
-        missing_information.append("Thieu merchant_id de doi chieu giao dich lien quan.")
+        missing_information.append("Thiếu merchant_id để đối chiếu giao dịch liên quan.")
     if not enterprise_profile.years_in_business:
-        missing_information.append("Thieu so nam hoat dong cua doanh nghiep.")
+        missing_information.append("Thiếu số năm hoạt động của doanh nghiệp.")
     return missing_information
 
 
 def _build_suggested_actions(risk_assessment: RiskAssessmentResult) -> list[str]:
     suggested_actions = [
-        "Doi chieu dong tien POS voi bien dong vao tai khoan de kiem tra tinh xac thuc cua doanh thu.",
-        "Kiem tra tinh day du, do moi va bat thuong cua bo du lieu giao dich truoc khi phe duyet.",
-        "Ra soat lai cac chi so rui ro noi bat va lap ke hoach giam sat sau giai ngan neu ho so du dieu kien.",
+        "Đối chiếu dòng tiền POS với biến động vào tài khoản để kiểm tra tính xác thực của doanh thu.",
+        "Kiểm tra tính đầy đủ, độ mới và bất thường của bộ dữ liệu giao dịch trước khi phê duyệt.",
+        "Rà soát lại các chỉ số rủi ro nổi bật và lập kế hoạch giám sát sau giải ngân nếu hồ sơ đủ điều kiện.",
     ]
     if risk_assessment.recommendation == "MANUAL_REVIEW":
-        suggested_actions.insert(0, "Chuyen ho so sang tham dinh thu cong bo sung.")
+        suggested_actions.insert(0, "Chuyển hồ sơ sang thẩm định thủ công bổ sung.")
     return suggested_actions
 
 
@@ -60,10 +61,10 @@ def _compose_report_text(
     recommendation: str,
 ) -> str:
     enterprise_overview = (
-        f"Doanh nghiep {enterprise_profile.name or enterprise_profile.customer_id} "
-        f"thuoc nganh {enterprise_profile.industry or 'chua ro'}, "
-        f"loai hinh {enterprise_profile.business_type or 'chua ro'}, "
-        f"hoat dong tai {enterprise_profile.location or 'chua ro'}."
+        f"Doanh nghiệp {enterprise_profile.name or enterprise_profile.customer_id} "
+        f"thuộc ngành {enterprise_profile.industry or 'chưa rõ'}, "
+        f"loại hình {enterprise_profile.business_type or 'chưa rõ'}, "
+        f"hoạt động tại {enterprise_profile.location or 'chưa rõ'}."
     )
     risk_lines = [
         f"- Credit score: {risk_assessment.credit_score:.2f}",
@@ -78,26 +79,26 @@ def _compose_report_text(
     missing_lines = (
         "\n".join(f"- {item}" for item in missing_information)
         if missing_information
-        else "- Khong co thong tin thieu noi bat."
+        else "- Không có thông tin thiếu nổi bật."
     )
     action_lines = "\n".join(f"- {item}" for item in suggested_actions)
 
     return "\n".join(
         [
-            "### 1. Tong quan khach hang",
+            "### 1. Tổng quan khách hàng",
             enterprise_overview,
             "",
-            "### 2. Danh gia rui ro",
+            "### 2. Đánh giá rủi ro",
             "\n".join(risk_lines),
             "",
-            "### 4. Thong tin con thieu",
+            "### 3. Thông tin còn thiếu",
             missing_lines,
             "",
-            "### 5. Khuyen nghi",
-            f"Quyet dinh: {recommendation}",
-            f"Ly do chinh: {risk_assessment.summary}",
+            "### 4. Khuyến nghị cho nhân viên ngân hàng",
+            f"Quyết định: {recommendation}",
+            f"Lý do chính: {risk_assessment.summary}",
             "",
-            "### 6. De xuat hanh dong",
+            "### 5. Đề xuất hành động",
             action_lines,
         ]
     )
@@ -114,6 +115,7 @@ class MockLoanAdvisoryGenerator:
     def generate(
         self,
         enterprise_profile: EnterpriseProfile,
+        enterprise_cic_metrics: EnterpriseCICMetrics,
         risk_assessment: RiskAssessmentResult,
     ) -> AdvisoryReport:
         key_reasons = _build_key_reasons(enterprise_profile, risk_assessment)
@@ -146,15 +148,14 @@ class QwenLoanAdvisoryGenerator:
     def generate(
         self,
         enterprise_profile: EnterpriseProfile,
+        enterprise_cic_metrics: EnterpriseCICMetrics,
         risk_assessment: RiskAssessmentResult,
     ) -> AdvisoryReport:
-        metric_summary = "\n".join(
-            f"- {item.name}: {item.value} ({item.note})" for item in risk_assessment.metric_insights
-        )
         prompt = LOAN_ADVISORY_PROMPT_TEMPLATE.format(
-            enterprise_profile=enterprise_profile.model_dump_json(indent=2),
-            risk_assessment=risk_assessment.model_dump_json(indent=2),
-            metric_summary=metric_summary or "- Khong co metric insight.",
+            loan_application_json=build_loan_model_input_json(
+                enterprise_profile=enterprise_profile,
+                enterprise_cic_metrics=enterprise_cic_metrics,
+            ),
         )
         text = self.llm_client.generate(prompt, max_new_tokens=256).strip()
 

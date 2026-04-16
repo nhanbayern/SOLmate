@@ -12,48 +12,13 @@ The current flow:
 4. Review whether the provided `risk_class` and `risk_probability` are reasonable.
 5. Return a compact explanation with the main risk signals.
 
-## Input shape
-
-The API accepts a payload like this:
-
-```json
-{
-  "customer_id": "CUST_70314034",
-  "credit_score": 342.61,
-  "metrics": {
-    "Revenue_mean_30d": 2939981.5951350383,
-    "Revenue_mean_90d": 4120090.034469776,
-    "Txn_frequency": 16.86872411150142,
-    "regime": "HIGH_RISK",
-    "Growth_value": -0.2864278279022144,
-    "Growth_score": 0.3567860860488928,
-    "CV_value": 0.5901900337623234,
-    "CV_score": 0,
-    "Spike_ratio": 2.202300634970376,
-    "Spike_score": 0,
-    "Txn_freq_score": 0.6560667393791124,
-    "Years_score": 0.2426819015442752,
-    "Industry_score": 0.7711962577582611
-  },
-  "risk_class": "LOW",
-  "risk_probability": 0.3584073061206929
-}
-```
-
-You can optionally include:
-
-```json
-{
-  "dataset_dir": "dataset"
-}
-```
 
 ## API
 
 Start the API:
 
 ```bash
-uvicorn app.api:app --host 0.0.0.0 --port 8000
+uvicorn app.api:app --port 8000
 ```
 
 Health check:
@@ -62,68 +27,52 @@ Health check:
 curl http://localhost:8000/health
 ```
 
-Risk review:
-
-```bash
-curl -X POST http://localhost:8000/risk-review \
-  -H "Content-Type: application/json" \
-  -d "{\"customer_id\":\"CUST_70314034\",\"credit_score\":342.61,\"metrics\":{\"Revenue_mean_30d\":2939981.5951350383,\"Revenue_mean_90d\":4120090.034469776,\"Txn_frequency\":16.86872411150142,\"regime\":\"HIGH_RISK\",\"Growth_value\":-0.2864278279022144,\"Growth_score\":0.3567860860488928,\"CV_value\":0.5901900337623234,\"CV_score\":0,\"Spike_ratio\":2.202300634970376,\"Spike_score\":0,\"Txn_freq_score\":0.6560667393791124,\"Years_score\":0.2426819015442752,\"Industry_score\":0.7711962577582611},\"risk_class\":\"LOW\",\"risk_probability\":0.3584073061206929}"
-```
-
-Example response shape:
+## Input
 
 ```json
 {
-  "customer_id": "CUST_70314034",
-  "provided_risk_class": "LOW",
-  "expected_risk_class": "POOR",
-  "provided_risk_probability": 0.3584,
-  "expected_risk_probability": 0.8045,
-  "expected_probability_band": "0.60-0.85",
-  "risk_class_is_reasonable": false,
-  "risk_probability_is_reasonable": false,
-  "recommendation": "MANUAL_REVIEW",
-  "summary": "...",
-  "findings": ["..."],
-  "report_text": "..."
+  "customer_id": "CUST_25552451",
+  "credit_score": 359.71,
+  "metrics": {
+    "Revenue_mean_30d": 500000,
+    "Revenue_mean_90d": 800413.56192567,
+    "Txn_frequency": 29.042773069940303,
+    "regime": "HIGH_RISK",
+    "Growth_value": -0.3753229283158595,
+    "Growth_score": 0.3123385358420703,
+    "CV_value": 0.5974958975348206,
+    "CV_score": 0,
+    "Spike_ratio": 2.032744919995281,
+    "Spike_score": 0.1393792333372658,
+    "Txn_freq_score": 0.7743000352157346,
+    "Years_score": 0.2530068586072541,
+    "Industry_score": 0.3983918839203907
+  },
+  "risk_class": "LOW",
+  "risk_probability": 0.518687260865519,
+  "enterprise_profile": {
+    "customer_id": "CUST_25552451",
+    "merchant_id": "MER_20471946",
+    "name": "Tạ Gia Phúc",
+    "age": 35,
+    "industry": "Transportation_Service",
+    "business_type": "Sole_Proprietor",
+    "years_in_business": 3.795102879108812,
+    "location": "Hưng Yên",
+    "created_at": "2022-08-14"
+  }
 }
 ```
 
-Get only `report_text_user` and `report_text_bank` from risk review:
-
-```bash
-curl -X POST http://localhost:8000/risk-review/report-text \
-  -H "Content-Type: application/json" \
-  -d "{\"customer_id\":\"CUST_70314034\",\"credit_score\":342.61,\"metrics\":{\"Revenue_mean_30d\":2939981.5951350383,\"Revenue_mean_90d\":4120090.034469776,\"Txn_frequency\":16.86872411150142,\"regime\":\"HIGH_RISK\",\"Growth_value\":-0.2864278279022144,\"Growth_score\":0.3567860860488928,\"CV_value\":0.5901900337623234,\"CV_score\":0,\"Spike_ratio\":2.202300634970376,\"Spike_score\":0,\"Txn_freq_score\":0.6560667393791124,\"Years_score\":0.2426819015442752,\"Industry_score\":0.7711962577582611},\"risk_class\":\"LOW\",\"risk_probability\":0.3584073061206929}"
-```
-
-Example response shape:
+## Outpur
 
 ```json
 {
-  "customer_id": "CUST_70314034",
+  "customer_id": "CUST_25552451",
   "report_text_user": "...",
   "report_text_bank": "..."
 }
 ```
-
-Get only `report_text` from advisory:
-
-```bash
-curl -X POST http://localhost:8000/advisory/report-text \
-  -H "Content-Type: application/json" \
-  -d "{\"mode\":\"demo\",\"customer_id\":\"CUST_70314034\",\"dataset_dir\":\"dataset\"}"
-```
-
-## CLI
-
-Run the same review from the command line:
-
-```bash
-python main.py --mode risk-review --input-file sample.json
-```
-
-Where `sample.json` contains the same direct CIC payload as above.
 
 ## Notes
 
