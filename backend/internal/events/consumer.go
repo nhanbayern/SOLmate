@@ -161,6 +161,7 @@ func (c *KafkaConsumer) ConsumeTransactionLog(ctx context.Context) error {
 			"Transaction consumed successfully",
 			"id", log.ID,
 			"merchant_id", log.MerchantID,
+			"customer_id", log.CustomerID,
 			"amount", log.Amount,
 			"is_refund", log.IsRefund,
 			"pos_terminal_id", log.POSTerminalID,

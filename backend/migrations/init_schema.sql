@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS merchants (
 CREATE TABLE IF NOT EXISTS transaction_logs (
   id SERIAL PRIMARY KEY,
   merchant_id VARCHAR(50) REFERENCES merchants(id) ON DELETE CASCADE,
+  customer_id VARCHAR(50) NOT NULL,
   amount DECIMAL(15, 2) NOT NULL,
   is_refund BOOLEAN DEFAULT FALSE,
   pos_terminal_id VARCHAR(100),
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS transaction_logs (
 CREATE TABLE IF NOT EXISTS loan_requests (
   id SERIAL PRIMARY KEY,
   merchant_id VARCHAR(50) REFERENCES merchants(id) ON DELETE CASCADE,
+  customer_id VARCHAR(50) NOT NULL,
   requested_amount DECIMAL(15, 2) NOT NULL,
   ai_score INT,
   risk_label VARCHAR(50),
@@ -37,5 +39,6 @@ CREATE TABLE IF NOT EXISTS loan_requests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_transactions_merchant_id ON transaction_logs(merchant_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_history ON transaction_logs(merchant_id, transaction_time);
+CREATE INDEX IF NOT EXISTS idx_transactions_history ON transaction_logs(merchant_id, customer_id, transaction_time);
 CREATE INDEX IF NOT EXISTS idx_loans_merchant_id ON loan_requests(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_loans_customer_id ON loan_requests(customer_id);

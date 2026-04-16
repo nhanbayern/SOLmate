@@ -5,6 +5,7 @@ import "time"
 type LoanRequest struct {
 	ID              int       `json:"id"`
 	MerchantID      string    `json:"merchant_id"`
+	CustomerID      string    `json:"customer_id"`
 	RequestedAmount float64   `json:"requested_amount"`
 	AIScore         int       `json:"ai_score"`
 	RiskLabel       string    `json:"risk_label"`

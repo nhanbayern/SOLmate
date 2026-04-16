@@ -26,7 +26,7 @@ func NewRedisRepo(rdb *redis.Client) *RedisRepo {
 }
 
 func (r *RedisRepo) UpdateFeatures(ctx context.Context, features *models.MerchantFeatures) error {
-	key := fmt.Sprintf("merchant:features:%s", features.MerchantID)
+	key := fmt.Sprintf("merchant:%s:customer:%s:features", features.MerchantID, features.CustomerID)
 
 	result, err := json.Marshal(features.Features)
 	if err != nil {
@@ -40,13 +40,14 @@ func (r *RedisRepo) UpdateFeatures(ctx context.Context, features *models.Merchan
 	r.log.Debug(
 		"Features updated successfully",
 		"merchant_id", features.MerchantID,
+		"customer_id", features.CustomerID,
 	)
 
 	return nil
 }
 
-func (r *RedisRepo) GetFeatures(ctx context.Context, merchantID string) (*models.MerchantFeatures, error) {
-	key := fmt.Sprintf("merchant:features:%s", merchantID)
+func (r *RedisRepo) GetFeatures(ctx context.Context, merchantID, customerID string) (*models.MerchantFeatures, error) {
+	key := fmt.Sprintf("merchant:%s:customer:%s:features", merchantID, customerID)
 
 	result, err := r.rdb.Get(ctx, key).Bytes()
 	if err != nil {
@@ -65,10 +66,12 @@ func (r *RedisRepo) GetFeatures(ctx context.Context, merchantID string) (*models
 	r.log.Debug(
 		"Features retrieved successfully",
 		"merchant_id", merchantID,
+		"customer_id", customerID,
 	)
 
 	return &models.MerchantFeatures{
 		MerchantID: merchantID,
+		CustomerID: customerID,
 		Features:   featuresArr,
 	}, nil
 }

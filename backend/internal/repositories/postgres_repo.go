@@ -26,13 +26,13 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 
 func (r *PostgresRepo) InsertTransactionLog(ctx context.Context, log *models.TransactionLog) error {
 	query := `
-	INSERT INTO transaction_logs (merchant_id, amount, is_refund, pos_terminal_id)
-		VALUES ($1, $2, $3, $4)
+	INSERT INTO transaction_logs (merchant_id, customer_id, amount, is_refund, pos_terminal_id)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, transaction_time, created_at
 	`
 
 	if err := r.db.QueryRowContext(ctx, query,
-		log.MerchantID, log.Amount, log.IsRefund, log.POSTerminalID,
+		log.MerchantID, log.CustomerID, log.Amount, log.IsRefund, log.POSTerminalID,
 	).Scan(&log.ID, &log.TransactionTime, &log.CreatedAt); err != nil {
 		return fmt.Errorf("insert transaction log: %w", err)
 	}
@@ -41,6 +41,7 @@ func (r *PostgresRepo) InsertTransactionLog(ctx context.Context, log *models.Tra
 		"Transaction saved successfully",
 		"id", log.ID,
 		"merchant_id", log.MerchantID,
+		"customer_id", log.CustomerID,
 		"amount", log.Amount,
 		"is_refund", log.IsRefund,
 		"pos_terminal_id", log.POSTerminalID,
@@ -85,15 +86,15 @@ func (r *PostgresRepo) GetMerchantMetadata(ctx context.Context, id string) (*mod
 	return &merchant, nil
 }
 
-func (r *PostgresRepo) GetTransactionHistory(ctx context.Context, merchantID string, since time.Time) ([]*models.TransactionLog, error) {
+func (r *PostgresRepo) GetTransactionHistory(ctx context.Context, merchantID, customerID string, since time.Time) ([]*models.TransactionLog, error) {
 	query := `
-	SELECT id, merchant_id, amount, is_refund, pos_terminal_id, transaction_time, created_at
+	SELECT id, merchant_id, customer_id, amount, is_refund, pos_terminal_id, transaction_time, created_at
 		FROM transaction_logs
-		WHERE merchant_id = $1 AND transaction_time >= $2
+		WHERE merchant_id = $1 AND customer_id = $2 AND transaction_time >= $3
 		ORDER BY transaction_time ASC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, merchantID, since)
+	rows, err := r.db.QueryContext(ctx, query, merchantID, customerID, since)
 	if err != nil {
 		return nil, fmt.Errorf("query transaction history: %w", err)
 	}
@@ -103,7 +104,7 @@ func (r *PostgresRepo) GetTransactionHistory(ctx context.Context, merchantID str
 	for rows.Next() {
 		var l models.TransactionLog
 		if err := rows.Scan(
-			&l.ID, &l.MerchantID, &l.Amount, &l.IsRefund, &l.POSTerminalID, &l.TransactionTime, &l.CreatedAt,
+			&l.ID, &l.MerchantID, &l.CustomerID, &l.Amount, &l.IsRefund, &l.POSTerminalID, &l.TransactionTime, &l.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction log: %w", err)
 		}
@@ -117,6 +118,7 @@ func (r *PostgresRepo) GetTransactionHistory(ctx context.Context, merchantID str
 	r.log.Debug(
 		"Get transaction history successfully",
 		"merchant_id", merchantID,
+		"customer_id", customerID,
 		"since", since,
 	)
 

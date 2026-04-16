@@ -11,7 +11,7 @@ import (
 )
 
 type LoanService interface {
-	EvaluateLoan(ctx context.Context, loanID int, merchantID string) error
+	EvaluateLoan(ctx context.Context, loanID int, merchantID, customerID string) error
 }
 
 type HTTPHandler struct {
@@ -49,14 +49,16 @@ func (h *HTTPHandler) EvaluateLoan(c *gin.Context) {
 		"Evaluate loan request received",
 		"loan_id", req.LoanID,
 		"merchant_id", req.MerchantID,
+		"customer_id", req.CustomerID,
 	)
 
-	err := h.loanService.EvaluateLoan(c.Request.Context(), req.LoanID, req.MerchantID)
+	err := h.loanService.EvaluateLoan(c.Request.Context(), req.LoanID, req.MerchantID, req.CustomerID)
 	if err != nil {
 		h.log.Error(
 			"Evaluate loan failed",
 			"loan_id", req.LoanID,
 			"merchant_id", req.MerchantID,
+			"customer_id", req.CustomerID,
 			infrastructure.KeyError, err.Error(),
 		)
 
@@ -72,6 +74,7 @@ func (h *HTTPHandler) EvaluateLoan(c *gin.Context) {
 		"Evaluate loan request successfully",
 		"loan_id", req.LoanID,
 		"merchant_id", req.MerchantID,
+		"customer_id", req.CustomerID,
 	)
 
 	c.JSON(http.StatusOK, gin.H{

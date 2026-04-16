@@ -13,7 +13,7 @@ import (
 type POSPostgresRepo interface {
 	InsertTransactionLog(ctx context.Context, log *models.TransactionLog) error
 	GetMerchantMetadata(ctx context.Context, id string) (*models.Merchant, error)
-	GetTransactionHistory(ctx context.Context, merchantID string, since time.Time) ([]*models.TransactionLog, error)
+	GetTransactionHistory(ctx context.Context, merchantID, customerID string, since time.Time) ([]*models.TransactionLog, error)
 }
 
 type POSRedisRepo interface {
@@ -50,16 +50,17 @@ func NewPOSService(
 	}
 }
 
-func (s *POSService) publishError(ctx context.Context, merchantID string, reason string) {
+func (s *POSService) publishError(ctx context.Context, merchantID, customerID string, reason string) {
 	errMsg := fmt.Sprintf(
-		`{"type": "ERROR", "merchant_id": "%s", "reason": "%s", "timestamp": "%s"}`,
-		merchantID, reason, time.Now().Format(time.RFC3339),
+		`{"type": "ERROR", "merchant_id": "%s", "customer_id": "%s", "reason": "%s", "timestamp": "%s"}`,
+		merchantID, customerID, reason, time.Now().Format(time.RFC3339),
 	)
 
 	if err := s.redisRepo.PublishUpdate(ctx, merchantID, errMsg); err != nil {
 		s.log.Warn(
 			"Publish Error SSE update failed",
 			"merchant_id", merchantID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 	}
@@ -70,6 +71,7 @@ func (s *POSService) ProcessTransaction(ctx context.Context, log *models.Transac
 		"Transaction processing",
 		"id", log.ID,
 		"merchant_id", log.MerchantID,
+		"customer_id", log.CustomerID,
 		"amount", log.Amount,
 		"is_refund", log.IsRefund,
 		"pos_terminal_id", log.POSTerminalID,
@@ -94,22 +96,21 @@ func (s *POSService) ProcessTransaction(ctx context.Context, log *models.Transac
 				infrastructure.KeyError, err.Error(),
 			)
 
-			s.publishError(calcCtx, log.MerchantID, "Fetch merchant metadata failed")
-
+			s.publishError(calcCtx, log.MerchantID, log.CustomerID, "Fetch merchant metadata failed")
 			return
 		}
 
 		since := time.Now().AddDate(0, 0, -180)
-		txns, err := s.pgRepo.GetTransactionHistory(calcCtx, log.MerchantID, since)
+		txns, err := s.pgRepo.GetTransactionHistory(calcCtx, log.MerchantID, log.CustomerID, since)
 		if err != nil {
 			s.log.Error(
 				"Fetch transaction history failed",
 				"merchant_id", log.MerchantID,
+				"customer_id", log.CustomerID,
 				infrastructure.KeyError, err.Error(),
 			)
 
-			s.publishError(calcCtx, log.MerchantID, "Fetch transaction history failed")
-
+			s.publishError(calcCtx, log.MerchantID, log.CustomerID, "Fetch transaction history failed")
 			return
 		}
 
@@ -118,16 +119,17 @@ func (s *POSService) ProcessTransaction(ctx context.Context, log *models.Transac
 			s.log.Error(
 				"Feature calculation failed",
 				"merchant_id", log.MerchantID,
+				"customer_id", log.CustomerID,
 				infrastructure.KeyError, err.Error(),
 			)
 
-			s.publishError(calcCtx, log.MerchantID, "Feature calculation failed")
-
+			s.publishError(calcCtx, log.MerchantID, log.CustomerID, "Feature calculation failed")
 			return
 		}
 
 		features := &models.MerchantFeatures{
 			MerchantID: log.MerchantID,
+			CustomerID: log.CustomerID,
 			Features:   featuresArr,
 		}
 
@@ -135,23 +137,24 @@ func (s *POSService) ProcessTransaction(ctx context.Context, log *models.Transac
 			s.log.Error(
 				"Save features to Redis failed",
 				"merchant_id", log.MerchantID,
+				"customer_id", log.CustomerID,
 				infrastructure.KeyError, err.Error(),
 			)
 
-			s.publishError(calcCtx, log.MerchantID, "Update internal cache failed")
-
+			s.publishError(calcCtx, log.MerchantID, log.CustomerID, "Update internal cache failed")
 			return
 		}
 
 		updateMsg := fmt.Sprintf(
-			`{"type": "FEATURES_UPDATED", "merchant_id": "%s", "timestamp": "%s"}`,
-			log.MerchantID, time.Now().Format(time.RFC3339),
+			`{"type": "FEATURES_UPDATED", "merchant_id": "%s", "customer_id": "%s", "timestamp": "%s"}`,
+			log.MerchantID, log.CustomerID, time.Now().Format(time.RFC3339),
 		)
 
 		if err := s.redisRepo.PublishUpdate(calcCtx, log.MerchantID, updateMsg); err != nil {
 			s.log.Warn(
 				"Publish SSE update failed",
 				"merchant_id", log.MerchantID,
+				"customer_id", log.CustomerID,
 				infrastructure.KeyError, err.Error(),
 			)
 		}

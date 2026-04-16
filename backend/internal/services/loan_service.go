@@ -20,7 +20,7 @@ type LoanPostgresRepo interface {
 }
 
 type LoanRedisRepo interface {
-	GetFeatures(ctx context.Context, merchantID string) (*models.MerchantFeatures, error)
+	GetFeatures(ctx context.Context, merchantID, customerID string) (*models.MerchantFeatures, error)
 	PublishUpdate(ctx context.Context, merchantID string, message string) error
 }
 
@@ -97,40 +97,43 @@ func NewLoanService(
 	}, nil
 }
 
-func (s *LoanService) publishError(ctx context.Context, merchantID string, reason string) {
+func (s *LoanService) publishError(ctx context.Context, merchantID, customerID string, reason string) {
 	errMsg := fmt.Sprintf(
-		`{"type": "ERROR", "merchant_id": "%s", "reason": "%s", "timestamp": "%s"}`,
-		merchantID, reason, time.Now().Format(time.RFC3339),
+		`{"type": "ERROR", "merchant_id": "%s", "customer_id": "%s", "reason": "%s", "timestamp": "%s"}`,
+		merchantID, customerID, reason, time.Now().Format(time.RFC3339),
 	)
 
 	if err := s.redisRepo.PublishUpdate(ctx, merchantID, errMsg); err != nil {
 		s.log.Warn(
 			"Publish Error SSE update failed",
 			"merchant_id", merchantID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 	}
 }
 
-func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID string) error {
+func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, customerID string) error {
 	s.log.Debug(
 		"Loan evaluation started",
 		"loan_id", loanID,
 		"merchant_id", merchantID,
+		"customer_id", customerID,
 	)
 
 	redisCtx, cancel := context.WithTimeout(ctx, s.cfg.RedisTimeout)
 	defer cancel()
 
-	merchantData, err := s.redisRepo.GetFeatures(redisCtx, merchantID)
+	merchantData, err := s.redisRepo.GetFeatures(redisCtx, merchantID, customerID)
 	if err != nil {
 		s.log.Error(
 			"Get features failed",
 			"loan_id", loanID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 
-		s.publishError(ctx, merchantID, "No transaction features found in cache")
+		s.publishError(ctx, merchantID, customerID, "No transaction features found in cache")
 
 		return fmt.Errorf("get features: %w", err)
 	}
@@ -140,10 +143,11 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID s
 		s.log.Error(
 			"Feature validation failed",
 			"loan_id", loanID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 
-		s.publishError(ctx, merchantID, "Feature validation failed")
+		s.publishError(ctx, merchantID, customerID, "Feature validation failed")
 
 		return fmt.Errorf("validate features: %w", err)
 	}
@@ -166,7 +170,7 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID s
 			infrastructure.KeyError, err.Error(),
 		)
 
-		s.publishError(ctx, merchantID, "Machine Learning model execution failed")
+		s.publishError(ctx, merchantID, customerID, "Machine Learning model execution failed")
 
 		return fmt.Errorf("run model: %w", err)
 	}
@@ -197,13 +201,14 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID s
 		"Model evaluated successfully",
 		"loan_id", loanID,
 		"merchant_id", merchantID,
+		"customer_id", customerID,
 		"score", score,
 		"risk_label", riskLabel,
 		"pd_value", fmt.Sprintf("%.4f", pdValue),
 	)
 
 	agentReq := models.AgentRiskRequest{
-		CustomerID:      merchantID,
+		CustomerID:      customerID,
 		CreditScore:     float64(score),
 		RiskClass:       riskLabel,
 		RiskProbability: pdValue,
@@ -246,6 +251,7 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID s
 			"Agent review failed",
 			"loan_id", loanID,
 			"merchant_id", merchantID,
+			"customer_id", customerID,
 			"score", score,
 			"risk_label", riskLabel,
 			"pd_value", fmt.Sprintf("%.4f", pdValue),
@@ -264,23 +270,25 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID s
 		s.log.Error(
 			"Update database failed",
 			"loan_id", loanID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 
-		s.publishError(ctx, merchantID, "Save evaluation result failed")
+		s.publishError(ctx, merchantID, customerID, "Save evaluation result failed")
 
 		return fmt.Errorf("update db: %w", err)
 	}
 
 	sseMsg := fmt.Sprintf(
-		`{"type": "EVALUATION_COMPLETED", "loan_id": %d, "merchant_id": "%s", "score": %d, "risk_label": "%s", "pd_value": %.4f}`,
-		loanID, merchantID, score, riskLabel, pdValue,
+		`{"type": "EVALUATION_COMPLETED", "loan_id": %d, "merchant_id": "%s", "customer_id": "%s", "score": %d, "risk_label": "%s", "pd_value": %.4f}`,
+		loanID, merchantID, customerID, score, riskLabel, pdValue,
 	)
 
 	if err := s.redisRepo.PublishUpdate(ctx, merchantID, sseMsg); err != nil {
 		s.log.Warn(
 			"Publish SSE update failed",
 			"merchant_id", merchantID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 	}
