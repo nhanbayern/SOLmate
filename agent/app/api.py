@@ -32,7 +32,7 @@ class AdvisoryResponse(BaseModel):
     summary: str
 
 
-class RiskReviewRequest(EnterpriseCICMetrics):
+class RiskReviewRequest(BaseModel):
     dataset_dir: str = Field(
         default="dataset",
         description="Directory containing credit_score_rules.json and cic_metrics_spec.json.",
@@ -40,6 +40,10 @@ class RiskReviewRequest(EnterpriseCICMetrics):
     enterprise_profile: EnterpriseProfile | None = Field(
         default=None,
         description="Optional basic enterprise profile used to enrich the final report.",
+    )
+    enterprise_cic_metrics: EnterpriseCICMetrics = Field(
+        ...,
+        description="CIC metrics and model risk signals for the enterprise.",
     )
 
 
