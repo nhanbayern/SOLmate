@@ -16,9 +16,24 @@ RISK_REVIEW_REPORT_TEMPLATE = """\
 """
 
 
+RISK_REVIEW_USER_REPORT_TEMPLATE = """\
+### 1. Thông tin cơ bản về doanh nghiệp
+{enterprise_overview}
+
+### 2. Tình trạng hiện tại của doanh nghiệp
+{business_status}
+
+### 3. Khả năng vay vốn hiện tại
+{loan_eligibility}
+
+### 4. Khuyến nghị cho doanh nghiệp
+{user_advice}
+"""
+
+
 LOAN_ADVISORY_PROMPT_TEMPLATE = """\
 # SYSTEM ROLE
-You are a Senior Credit Risk Analyst at a Vietnamese commercial bank. Your objective is to evaluate business loan applications and generate a highly professional, concise, and accurate advisory report for Bank Officers.
+You are a Senior Credit Risk Analyst at a Vietnamese commercial bank. Your objective is to evaluate business loan applications and generate a highly professional, concise, and accurate advisory report with two clearly separated recommendation sections: one for Bank Officers and one for the business.
 
 # INPUT DATA
 Please review the following information:
@@ -44,6 +59,8 @@ Please review the following information:
 6. Never output Vietnamese text without diacritics. For example, write "doanh nghiep", "khuyen nghi", "xac suat", "hoat dong" with proper Vietnamese diacritics in the final answer.
 7. The only strings allowed to remain without Vietnamese diacritics are fixed identifiers or technical tokens such as customer IDs, enum values, metric keys, or formulas, for example: CUST_24239251, MEDIUM, Spike_ratio, Growth_score.
 8. Before finalizing, self-check the full report and rewrite any Vietnamese phrase that is missing diacritics.
+9. The output MUST include exactly 2 advice sections: "Khuyến nghị cho nhân viên ngân hàng" and "Khuyến nghị cho doanh nghiệp".
+10. The bank advice is for internal credit decisioning and may include the recommendation category. The business advice must be customer-facing, easy to understand, practical, and should focus on what the business needs to improve or prepare next.
 
 # OUTPUT FORMAT
 You must generate the report exactly in the following Markdown structure, written entirely in Vietnamese with proper diacritics. Do not include any extra pleasantries before or after the report.
@@ -54,16 +71,19 @@ You must generate the report exactly in the following Markdown structure, writte
 ### 2. Đánh giá mức độ rủi ro của doanh nghiệp
 [Provide a concise synthesis of the credit score, CIC notes, and model risk levels, based on <risk_assessment> and <cic_metrics>. Highlight the top 2-3 risk factors contributing to the assessment, with specific values and notes from the CIC insights or model explanations.]
 
-### 4. Những thông tin còn thiếu của doanh nghiệp
+### 3. Những thông tin còn thiếu của doanh nghiệp
 [If there are no critical missing information, write "Không có thông tin quan trọng nào bị thiếu."]
 [Bullet point list of documents or data that the Bank Officer needs to collect.]
 - [Do not list the financial statements as the required document for checking, clients do not have financial statement]
 - [Item 1]
 - [Item 2]
 
-### 5. Khuyến nghị cho nhân viên ngân hàng
+### 4. Khuyến nghị cho nhân viên ngân hàng
 Quyết định: [APPROVE / APPROVE WITH CONDITIONS / REJECT / MANUAL REVIEW]
 Lý do chính: [1-2 sentences explaining why this decision was made based on the risk signals and available business data.]
+
+### 5. Khuyến nghị cho doanh nghiệp
+[Provide 2-3 sentences of practical advice for the business owner in clear Vietnamese. Focus on what they should improve, clarify, or prepare next to improve creditworthiness or support the loan assessment.]
 
 ### 6. Đề xuất hành động tiếp theo cho nhân viên ngân hàng
 [Instructions for this section:

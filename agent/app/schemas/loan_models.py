@@ -74,8 +74,11 @@ class RiskReviewResult(BaseModel):
     enterprise_overview: str
     current_overview: str
     bank_advice: str
+    user_advice: str
     next_actions: list[str] = Field(default_factory=list)
     report_text: str
+    report_text_user: str
+    report_text_bank: str
 
 
 class AdvisoryReport(BaseModel):

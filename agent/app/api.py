@@ -64,7 +64,8 @@ class RiskReviewResponse(BaseModel):
 
 class ReportTextResponse(BaseModel):
     customer_id: str
-    report_text: str
+    report_text_user: str
+    report_text_bank: str
 
 
 def _make_service(mode: str):
@@ -138,5 +139,6 @@ def review_risk_input_report_text(request: RiskReviewRequest) -> ReportTextRespo
 
     return ReportTextResponse(
         customer_id=result.risk_assessment.customer_id,
-        report_text=result.report_text,
+        report_text_user=result.report_text_user,
+        report_text_bank=result.report_text_bank,
     )

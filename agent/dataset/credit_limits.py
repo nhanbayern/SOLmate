@@ -81,7 +81,7 @@ def calculate_credit_limit(customer_data: pd.Series, coefficient_set_name: str) 
         b[2] * txn_freq_sc -
         b[3] * cv_sc -
         b[4] * spike_sc -
-        b[5] * default_prob -
+        b[5] * default_prob +
         b[6] * cic_sc
     )
     
