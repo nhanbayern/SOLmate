@@ -45,6 +45,7 @@ func run() error {
 	redisRepo := repositories.NewRedisRepo(rdb)
 	agentService := services.NewAgentService(cfg.ToAgentServiceConfig())
 	authService := services.NewAuthService(userRepo, cfg.ToAuthServiceConfig())
+	dashboardService := services.NewDashboardService(pgRepo, cfg.ToLoanServiceConfig())
 
 	dllPath := "./ai_models/onnxruntime.dll"
 	modelPath := "./ai_models/XGBoost.onnx"
@@ -57,6 +58,11 @@ func run() error {
 	httpHandler := handlers.NewHTTPHandler(loanService)
 	sseHandler := handlers.NewSSEHandler(rdb)
 	authHandler := handlers.NewAuthHandler(authService)
+
+	merchantHandler := handlers.NewMerchantHandler(dashboardService)
+	loanDashboardHandler := handlers.NewLoanHandler(dashboardService)
+	transactionHandler := handlers.NewTransactionHandler(dashboardService)
+	statsHandler := handlers.NewStatsHandler(dashboardService)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -90,6 +96,17 @@ func run() error {
 	api.Use(authHandler.AuthMiddleware())
 	{
 		api.POST("/loans/evaluate", httpHandler.EvaluateLoan)
+
+		api.GET("/merchants", merchantHandler.List)
+		api.GET("/merchants/:id", merchantHandler.Get)
+
+		api.GET("/loans", loanDashboardHandler.List)
+		api.GET("/loans/:id", loanDashboardHandler.Get)
+
+		api.GET("/transactions", transactionHandler.List)
+
+		api.GET("/stats", statsHandler.Get)
+
 		api.GET("/loans/stream", sseHandler.SubscribeToMerchantStatus)
 	}
 

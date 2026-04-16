@@ -125,6 +125,146 @@ func (r *PostgresRepo) GetTransactionHistory(ctx context.Context, merchantID, cu
 	return logs, nil
 }
 
+func (r *PostgresRepo) GetAllMerchants(ctx context.Context) ([]*models.Merchant, error) {
+	query := `
+	SELECT id, name, business_type, industry, years_in_business, owner_name, kyc_status, created_at, updated_at
+		FROM merchants
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query all merchants: %w", err)
+	}
+	defer rows.Close()
+
+	var merchants []*models.Merchant
+	for rows.Next() {
+		var m models.Merchant
+		if err := rows.Scan(
+			&m.ID, &m.Name, &m.BusinessType, &m.Industry, &m.YearsInBusiness, &m.OwnerName, &m.KYCStatus, &m.CreatedAt, &m.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan merchant: %w", err)
+		}
+		merchants = append(merchants, &m)
+	}
+
+	r.log.Debug(
+		"Fetch all merchants successfully",
+		"count", len(merchants),
+	)
+
+	return merchants, nil
+}
+
+func (r *PostgresRepo) GetAllLoanRequests(ctx context.Context) ([]*models.LoanRequest, error) {
+	query := `
+	SELECT id, merchant_id, customer_id, requested_amount, ai_score, risk_label, pd_value, ai_agent_report, status, created_at, updated_at
+		FROM loan_requests
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query all loan requests: %w", err)
+	}
+	defer rows.Close()
+
+	var requests []*models.LoanRequest
+	for rows.Next() {
+		var req models.LoanRequest
+		if err := rows.Scan(
+			&req.ID, &req.MerchantID, &req.CustomerID, &req.RequestedAmount, &req.AIScore, &req.RiskLabel, &req.PDValue, &req.AIAgentReport, &req.Status, &req.CreatedAt, &req.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan loan request: %w", err)
+		}
+		requests = append(requests, &req)
+	}
+
+	r.log.Debug(
+		"Fetch all loan requests successfully",
+		"count", len(requests),
+	)
+
+	return requests, nil
+}
+
+func (r *PostgresRepo) GetLoanRequestByID(ctx context.Context, id int) (*models.LoanRequest, error) {
+	query := `
+	SELECT id, merchant_id, customer_id, requested_amount, ai_score, risk_label, pd_value, ai_agent_report, status, created_at, updated_at
+		FROM loan_requests
+		WHERE id = $1
+	`
+
+	var req models.LoanRequest
+	if err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&req.ID, &req.MerchantID, &req.CustomerID, &req.RequestedAmount, &req.AIScore, &req.RiskLabel, &req.PDValue, &req.AIAgentReport, &req.Status, &req.CreatedAt, &req.UpdatedAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("get loan request by id: %w", err)
+	}
+
+	r.log.Debug(
+		"Fetch loan request by ID successfully",
+		"loan_id", id,
+	)
+
+	return &req, nil
+}
+
+func (r *PostgresRepo) GetDashboardStats(ctx context.Context) (*models.DashboardStats, error) {
+	var totalRequests int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM loan_requests").Scan(&totalRequests)
+	if err != nil {
+		return nil, fmt.Errorf("count loan requests: %w", err)
+	}
+
+	var totalApprovedAmount sql.NullFloat64
+	err = r.db.QueryRowContext(ctx, "SELECT SUM(requested_amount) FROM loan_requests WHERE status = 'APPROVED'").Scan(&totalApprovedAmount)
+	if err != nil {
+		return nil, fmt.Errorf("sum approved amount: %w", err)
+	}
+
+	var totalApproved int
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM loan_requests WHERE status = 'APPROVED'").Scan(&totalApproved)
+	if err != nil {
+		return nil, fmt.Errorf("count approved: %w", err)
+	}
+
+	approvalRate := 0.0
+	if totalRequests > 0 {
+		approvalRate = float64(totalApproved) / float64(totalRequests) * 100.0
+	}
+
+	riskDistribution := make(map[string]int)
+	rows, err := r.db.QueryContext(ctx, "SELECT risk_label, COUNT(*) FROM loan_requests WHERE risk_label IS NOT NULL GROUP BY risk_label")
+	if err != nil {
+		return nil, fmt.Errorf("query risk distribution: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var riskLabel string
+		var count int
+		if err := rows.Scan(&riskLabel, &count); err != nil {
+			return nil, fmt.Errorf("scan risk distribution: %w", err)
+		}
+		riskDistribution[riskLabel] = count
+	}
+
+	r.log.Debug("Fetch dashboard stats successfully")
+
+	return &models.DashboardStats{
+		TotalRequests:       totalRequests,
+		TotalApprovedAmount: totalApprovedAmount.Float64,
+		ApprovalRate:        approvalRate,
+		RiskDistribution:    riskDistribution,
+	}, nil
+}
+
 func (r *PostgresRepo) UpdateLoanAIReport(
 	ctx context.Context,
 	loanID, score int,
