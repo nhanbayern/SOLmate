@@ -102,6 +102,7 @@ func run() error {
 
 		api.GET("/loans", loanDashboardHandler.List)
 		api.GET("/loans/:id", loanDashboardHandler.Get)
+		api.POST("/loans/:id/decision", loanDashboardHandler.Decision)
 
 		api.GET("/transactions", transactionHandler.List)
 

@@ -274,7 +274,7 @@ func (r *PostgresRepo) UpdateLoanAIReport(
 ) error {
 	query := `
 	UPDATE loan_requests 
-		SET ai_score = $1, risk_label = $2, pd_value = $3, ai_agent_report = $4, status = 'APPROVED', updated_at = CURRENT_TIMESTAMP
+		SET ai_score = $1, risk_label = $2, pd_value = $3, ai_agent_report = $4, status = 'EVALUATED', updated_at = CURRENT_TIMESTAMP
 		WHERE id = $5
 	`
 
@@ -306,6 +306,36 @@ func (r *PostgresRepo) UpdateLoanAIReport(
 		"score", score,
 		"risk_label", riskLabel,
 		"pd_value", pdValue,
+	)
+
+	return nil
+}
+
+func (r *PostgresRepo) UpdateLoanStatus(ctx context.Context, id int, status string) error {
+	query := `
+	UPDATE loan_requests 
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, status, id)
+	if err != nil {
+		return fmt.Errorf("update loan status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("loan not found")
+	}
+
+	r.log.Debug(
+		"Loan status updated successfully",
+		"loan_id", id,
+		"status", status,
 	)
 
 	return nil

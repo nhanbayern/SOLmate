@@ -10,3 +10,7 @@ type LoginRequest struct {
 	UserID   string `json:"user_id"`
 	Password string `json:"password"`
 }
+
+type LoanDecisionRequest struct {
+	Status string `json:"status" binding:"required,oneof=APPROVED REJECTED"`
+}

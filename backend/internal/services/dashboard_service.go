@@ -16,6 +16,7 @@ type DashboardPostgresRepo interface {
 	GetAllLoanRequests(ctx context.Context) ([]*models.LoanRequest, error)
 	GetLoanRequestByID(ctx context.Context, id int) (*models.LoanRequest, error)
 	GetDashboardStats(ctx context.Context) (*models.DashboardStats, error)
+	UpdateLoanStatus(ctx context.Context, id int, status string) error
 }
 
 type DashboardService struct {
@@ -76,4 +77,11 @@ func (s *DashboardService) GetDashboardStats(ctx context.Context) (*models.Dashb
 	defer cancel()
 
 	return s.pgRepo.GetDashboardStats(dbCtx)
+}
+
+func (s *DashboardService) MakeLoanDecision(ctx context.Context, id int, status string) error {
+	dbCtx, cancel := context.WithTimeout(ctx, s.cfg.DBTimeout)
+	defer cancel()
+
+	return s.pgRepo.UpdateLoanStatus(dbCtx, id, status)
 }
