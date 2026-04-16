@@ -28,6 +28,18 @@ func NewTransactionHandler(service TransactionDashboardService) *TransactionHand
 	}
 }
 
+// List godoc
+// @Summary      List Transactions
+// @Description   Return transaction logs for a specific merchant and customer (last 90 days)
+// @Tags         transactions
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        merchant_id  query      string  true  "Merchant ID"
+// @Param        customer_id  query      string  true  "Customer ID"
+// @Success      200          {object}  map[string]interface{}
+// @Failure      400          {object}  map[string]interface{}
+// @Router       /api/transactions [get]
 func (h *TransactionHandler) List(c *gin.Context) {
 	merchantID := c.Query("merchant_id")
 	customerID := c.Query("customer_id")

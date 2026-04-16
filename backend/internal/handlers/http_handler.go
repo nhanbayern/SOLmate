@@ -28,6 +28,17 @@ func NewHTTPHandler(loanService LoanService) *HTTPHandler {
 	}
 }
 
+// EvaluateLoan godoc
+// @Summary      Evaluate Loan Request
+// @Description   Trigger AI evaluation for a loan request using XGBoost
+// @Tags         loans
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request  body      requests.EvaluateLoanRequest  true  "Evaluation payload"
+// @Success      200      {object}  map[string]interface{}
+// @Failure      400      {object}  map[string]interface{}
+// @Router       /api/loans/evaluate [post]
 func (h *HTTPHandler) EvaluateLoan(c *gin.Context) {
 	var req requests.EvaluateLoanRequest
 

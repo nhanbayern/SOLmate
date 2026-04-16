@@ -25,6 +25,17 @@ func NewSSEHandler(rdb *redis.Client) *SSEHandler {
 	}
 }
 
+// SubscribeToMerchantStatus godoc
+// @Summary      Subscribe to Merchant Status SSE
+// @Description   Server-Sent Events endpoint to stream real-time updates for a merchant's applications
+// @Tags         loans
+// @Accept       json
+// @Produce      text/event-stream
+// @Security     BearerAuth
+// @Param        merchant_id  query      string  true  "Merchant ID"
+// @Success      200      {string}  string "SSE stream"
+// @Failure      400      {object}  map[string]interface{}
+// @Router       /api/loans/stream [get]
 func (h *SSEHandler) SubscribeToMerchantStatus(c *gin.Context) {
 	merchantID := c.Query("merchant_id")
 	if merchantID == "" {

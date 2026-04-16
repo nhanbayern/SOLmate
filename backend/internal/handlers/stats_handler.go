@@ -28,6 +28,15 @@ func NewStatsHandler(service StatsDashboardService) *StatsHandler {
 	}
 }
 
+// Get godoc
+// @Summary      Get Dashboard Stats
+// @Description   Return high-level dashboard metrics for the overview page
+// @Tags         stats
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200      {object}  map[string]interface{}
+// @Router       /api/stats [get]
 func (h *StatsHandler) Get(c *gin.Context) {
 	h.log.Debug("Get stats request received")
 

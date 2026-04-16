@@ -1,0 +1,337 @@
+basePath: /
+definitions:
+  requests.EvaluateLoanRequest:
+    properties:
+      customer_id:
+        type: string
+      loan_id:
+        type: integer
+      merchant_id:
+        type: string
+    required:
+    - customer_id
+    - loan_id
+    - merchant_id
+    type: object
+  requests.LoanDecisionRequest:
+    properties:
+      status:
+        enum:
+        - APPROVED
+        - REJECTED
+        type: string
+    required:
+    - status
+    type: object
+  requests.LoginRequest:
+    properties:
+      password:
+        type: string
+      user_id:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Backend APIs for SOLmate - AI-powered lending platform.
+  title: SOLmate Banker Dashboard API
+  version: "1.0"
+paths:
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/requests.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      summary: User Login
+      tags:
+      - auth
+  /api/auth/me:
+    get:
+      consumes:
+      - application/json
+      description: Return current authenticated user profile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Current User
+      tags:
+      - auth
+  /api/loans:
+    get:
+      consumes:
+      - application/json
+      description: Get all loan evaluation requests and their results
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List Loan Requests
+      tags:
+      - loans
+  /api/loans/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed evaluation results of a specific loan request
+      parameters:
+      - description: Loan Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Loan Request Detail
+      tags:
+      - loans
+  /api/loans/{id}/decision:
+    post:
+      consumes:
+      - application/json
+      description: Manually approve or reject a loan request after AI evaluation
+      parameters:
+      - description: Loan Request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Decision payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/requests.LoanDecisionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Apply Loan Decision
+      tags:
+      - loans
+  /api/loans/evaluate:
+    post:
+      consumes:
+      - application/json
+      description: Trigger AI evaluation for a loan request using XGBoost
+      parameters:
+      - description: Evaluation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/requests.EvaluateLoanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Evaluate Loan Request
+      tags:
+      - loans
+  /api/loans/stream:
+    get:
+      consumes:
+      - application/json
+      description: Server-Sent Events endpoint to stream real-time updates for a merchant's
+        applications
+      parameters:
+      - description: Merchant ID
+        in: query
+        name: merchant_id
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Subscribe to Merchant Status SSE
+      tags:
+      - loans
+  /api/merchants:
+    get:
+      consumes:
+      - application/json
+      description: Get all merchants with their basic metadata
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List Merchants
+      tags:
+      - merchants
+  /api/merchants/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed metadata of a specific merchant by ID
+      parameters:
+      - description: Merchant ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Merchant Detailed
+      tags:
+      - merchants
+  /api/stats:
+    get:
+      consumes:
+      - application/json
+      description: Return high-level dashboard metrics for the overview page
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Dashboard Stats
+      tags:
+      - stats
+  /api/transactions:
+    get:
+      consumes:
+      - application/json
+      description: Return transaction logs for a specific merchant and customer (last
+        90 days)
+      parameters:
+      - description: Merchant ID
+        in: query
+        name: merchant_id
+        required: true
+        type: string
+      - description: Customer ID
+        in: query
+        name: customer_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List Transactions
+      tags:
+      - transactions
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

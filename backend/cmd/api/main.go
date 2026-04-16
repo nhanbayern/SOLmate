@@ -15,7 +15,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "backend/docs"
+
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func run() error {
@@ -111,6 +115,8 @@ func run() error {
 		api.GET("/loans/stream", sseHandler.SubscribeToMerchantStatus)
 	}
 
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	srv := &http.Server{
 		Addr:         cfg.ServerPort,
 		Handler:      r,
@@ -168,6 +174,14 @@ func run() error {
 	return nil
 }
 
+// @title           SOLmate Banker Dashboard API
+// @version         1.0
+// @description     Backend APIs for SOLmate - AI-powered lending platform.
+// @host            localhost:8080
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	if err := run(); err != nil {
 		slog.Error(

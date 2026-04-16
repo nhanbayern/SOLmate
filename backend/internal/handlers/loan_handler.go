@@ -33,6 +33,15 @@ func NewLoanHandler(service LoanDashboardService) *LoanHandler {
 	}
 }
 
+// List godoc
+// @Summary      List Loan Requests
+// @Description   Get all loan evaluation requests and their results
+// @Tags         loans
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200      {object}  map[string]interface{}
+// @Router       /api/loans [get]
 func (h *LoanHandler) List(c *gin.Context) {
 	h.log.Debug("List loan requests received")
 
@@ -58,6 +67,17 @@ func (h *LoanHandler) List(c *gin.Context) {
 	})
 }
 
+// Get godoc
+// @Summary      Get Loan Request Detail
+// @Description   Get detailed evaluation results of a specific loan request
+// @Tags         loans
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Loan Request ID"
+// @Success      200      {object}  map[string]interface{}
+// @Failure      404      {object}  map[string]interface{}
+// @Router       /api/loans/{id} [get]
 func (h *LoanHandler) Get(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -105,6 +125,18 @@ func (h *LoanHandler) Get(c *gin.Context) {
 	})
 }
 
+// Decision godoc
+// @Summary      Apply Loan Decision
+// @Description   Manually approve or reject a loan request after AI evaluation
+// @Tags         loans
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id       path      int  true  "Loan Request ID"
+// @Param        request  body      requests.LoanDecisionRequest  true  "Decision payload"
+// @Success      200      {object}  map[string]interface{}
+// @Failure      400      {object}  map[string]interface{}
+// @Router       /api/loans/{id}/decision [post]
 func (h *LoanHandler) Decision(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)

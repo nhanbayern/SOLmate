@@ -29,6 +29,15 @@ func NewMerchantHandler(service MerchantDashboardService) *MerchantHandler {
 	}
 }
 
+// List godoc
+// @Summary      List Merchants
+// @Description   Get all merchants with their basic metadata
+// @Tags         merchants
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200      {object}  map[string]interface{}
+// @Router       /api/merchants [get]
 func (h *MerchantHandler) List(c *gin.Context) {
 	h.log.Debug("List merchants request received")
 
@@ -51,6 +60,17 @@ func (h *MerchantHandler) List(c *gin.Context) {
 	})
 }
 
+// Get godoc
+// @Summary      Get Merchant Detailed
+// @Description   Get detailed metadata of a specific merchant by ID
+// @Tags         merchants
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Merchant ID"
+// @Success      200      {object}  map[string]interface{}
+// @Failure      404      {object}  map[string]interface{}
+// @Router       /api/merchants/{id} [get]
 func (h *MerchantHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 
