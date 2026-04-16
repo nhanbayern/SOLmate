@@ -40,10 +40,10 @@ class LoanRiskEngine:
             risk_probability=risk_probability,
         )
         summary = (
-            f"Doanh nghiep {enterprise_profile.customer_id} hoat dong trong nganh "
-            f"{enterprise_profile.industry or 'chua ro'}, credit score "
-            f"{enterprise_cic_metrics.credit_score:.2f}, thuoc muc {matched_rule.level}, "
-            f"rui ro mo hinh {normalized_risk_class} ({risk_probability:.2f})."
+            f"Doanh nghiệp {enterprise_profile.customer_id} hoạt động trong ngành "
+            f"{enterprise_profile.industry or 'chưa rõ'}, credit score "
+            f"{enterprise_cic_metrics.credit_score:.2f}, thuộc mức {matched_rule.level}, "
+            f"rủi ro mô hình {normalized_risk_class} ({risk_probability:.2f})."
         )
         return RiskAssessmentResult(
             customer_id=enterprise_profile.customer_id,
@@ -108,23 +108,23 @@ class LoanRiskEngine:
 
         findings = [
             (
-                f"Credit score {enterprise_cic_metrics.credit_score:.2f} nam trong rule "
+                f"Credit score {enterprise_cic_metrics.credit_score:.2f} nằm trong rule "
                 f"{matched_rule.level} ({matched_rule.decision})."
             )
         ]
         if regime:
-            findings.append(f"Metric 'regime' dang o muc {regime}.")
+            findings.append(f"Metric 'regime' đang ở mức {regime}.")
 
         for factor in risk_assessment.top_risk_factors[:4]:
             findings.append(f"{factor.name}={factor.value}: {factor.note}")
 
         if provided_risk_class != expected_risk_class:
             findings.append(
-                f"Nhan dau vao la {provided_risk_class} nhung tong hop tin hieu nghieng ve {expected_risk_class}."
+                f"Nhãn đầu vào là {provided_risk_class} nhưng tổng hợp tín hiệu nghiêng về {expected_risk_class}."
             )
         if not probability_is_reasonable:
             findings.append(
-                f"Xac suat {enterprise_cic_metrics.risk_probability:.4f} lech vung ky vong "
+                f"Xác suất {enterprise_cic_metrics.risk_probability:.4f} lệch vùng kỳ vọng "
                 f"{probability_band[0]:.2f}-{probability_band[1]:.2f}."
             )
 
@@ -194,7 +194,7 @@ class LoanRiskEngine:
         insights: list[RiskFactor] = []
         for metric_name, metric_value in metrics.items():
             spec = spec_map.get(metric_name)
-            note = "Khong co mo ta metrics."
+            note = "Không có mô tả cho metric này."
             if spec is not None:
                 note_parts = [part for part in [spec.note, spec.value] if part]
                 note = " ".join(note_parts).strip()

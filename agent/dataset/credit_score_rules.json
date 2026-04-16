@@ -26,7 +26,7 @@
   {
     "min_score": 322,
     "max_score": 430,
-    "level": "POOR",
+    "level": "LOW",
     "risk": "HIGH",
     "decision": "LIKELY_REJECT",
     "note": "Low approval probability"
@@ -34,7 +34,7 @@
   {
     "min_score": 150,
     "max_score": 321,
-    "level": "VERY_POOR",
+    "level": "VERY_LOW",
     "risk": "VERY_HIGH",
     "decision": "REJECT",
     "note": "Very high default risk, reject application"

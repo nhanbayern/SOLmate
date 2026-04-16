@@ -1,17 +1,17 @@
 RISK_REVIEW_REPORT_TEMPLATE = """\
-### 1. Thong Tin Co Ban Doanh Nghiep
+### 1. Thông tin cơ bản về doanh nghiệp
 {enterprise_overview}
 
-### 2. Kiem Tra Lai Phan Loai Risk Class
+### 2. Kiểm tra lại phân loại của Risk Class
 {risk_class_review}
 
-### 3. Tong Quan Tinh Hinh Hien Tai
+### 3. Tổng quan tình hình hiện tại của doanh nghiệp
 {current_overview}
 
-### 4. Khuyen Nghi Cho Nhan Vien Ngan Hang
+### 4. Khuyến nghị cho nhân viên ngân hàng
 {bank_advice}
 
-### 5. De Xuat Hanh Dong
+### 5. Đề xuất hành động tiếp theo cho nhân viên ngân hàng
 {next_actions}
 """
 
@@ -48,24 +48,24 @@ Please review the following information:
 # OUTPUT FORMAT
 You must generate the report exactly in the following Markdown structure, written entirely in Vietnamese with proper diacritics. Do not include any extra pleasantries before or after the report.
 
-### 1. Thông tin về khách hàng
+### 1. Thông tin cơ bản về doanh nghiệp
 [Provide a 1-2 sentence overview of the enterprise, based on <enterprise_profile>: customer_id, name, age, industry, business_type, years_in_business, location, created_at]
 
-### 2. Đánh giá mức độ rủi ro của khách hàng
+### 2. Đánh giá mức độ rủi ro của doanh nghiệp
 [Provide a concise synthesis of the credit score, CIC notes, and model risk levels, based on <risk_assessment> and <cic_metrics>. Highlight the top 2-3 risk factors contributing to the assessment, with specific values and notes from the CIC insights or model explanations.]
 
-### 4. Những thông tin còn thiếu của khách hàng
+### 4. Những thông tin còn thiếu của doanh nghiệp
 [If there are no critical missing information, write "Không có thông tin quan trọng nào bị thiếu."]
 [Bullet point list of documents or data that the Bank Officer needs to collect.]
 - [Do not list the financial statements as the required document for checking, clients do not have financial statement]
 - [Item 1]
 - [Item 2]
 
-### 5. Khuyến nghị
+### 5. Khuyến nghị cho nhân viên ngân hàng
 Quyết định: [APPROVE / APPROVE WITH CONDITIONS / REJECT / MANUAL REVIEW]
 Lý do chính: [1-2 sentences explaining why this decision was made based on the risk signals and available business data.]
 
-### 6. Đề xuất hành động cần làm tiếp theo
+### 6. Đề xuất hành động tiếp theo cho nhân viên ngân hàng
 [Instructions for this section:
 - Focus on verification actions based on transaction data, POS data, and model outputs instead of traditional document-heavy processes.
 - Include specific checks to validate cashflow authenticity, data integrity, and risk signals from the model.

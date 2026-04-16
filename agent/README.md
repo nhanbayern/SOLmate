@@ -89,6 +89,22 @@ Example response shape:
 }
 ```
 
+Get only `report_text` from risk review:
+
+```bash
+curl -X POST http://localhost:8000/risk-review/report-text \
+  -H "Content-Type: application/json" \
+  -d "{\"customer_id\":\"CUST_70314034\",\"credit_score\":342.61,\"metrics\":{\"Revenue_mean_30d\":2939981.5951350383,\"Revenue_mean_90d\":4120090.034469776,\"Txn_frequency\":16.86872411150142,\"regime\":\"HIGH_RISK\",\"Growth_value\":-0.2864278279022144,\"Growth_score\":0.3567860860488928,\"CV_value\":0.5901900337623234,\"CV_score\":0,\"Spike_ratio\":2.202300634970376,\"Spike_score\":0,\"Txn_freq_score\":0.6560667393791124,\"Years_score\":0.2426819015442752,\"Industry_score\":0.7711962577582611},\"risk_class\":\"LOW\",\"risk_probability\":0.3584073061206929}"
+```
+
+Get only `report_text` from advisory:
+
+```bash
+curl -X POST http://localhost:8000/advisory/report-text \
+  -H "Content-Type: application/json" \
+  -d "{\"mode\":\"demo\",\"customer_id\":\"CUST_70314034\",\"dataset_dir\":\"dataset\"}"
+```
+
 ## CLI
 
 Run the same review from the command line:

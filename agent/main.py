@@ -1,15 +1,7 @@
 import argparse
-import json
 import sys
-from pathlib import Path
 
-from app.pipeline import (
-    build_demo_loan_advisory_pipeline,
-    build_qwen_loan_advisory_pipeline,
-    build_risk_review_service,
-    load_risk_review_payload,
-)
-from app.schemas.loan_models import EnterpriseCICMetrics, EnterpriseProfile
+from app.report_runner import run_loan_advisory, run_risk_review_from_file
 
 
 def main() -> None:
@@ -43,37 +35,17 @@ def main() -> None:
     if args.mode == "risk-review":
         if not args.input_file:
             raise ValueError("--input-file is required when --mode risk-review.")
-        payload = json.loads(Path(args.input_file).read_text(encoding="utf-8"))
-        service = build_risk_review_service()
-        references = load_risk_review_payload(dataset_dir=args.dataset_dir)
-        enterprise_profile = None
-        if "enterprise_profile" in payload:
-            enterprise_profile = EnterpriseProfile(**payload.pop("enterprise_profile"))
-        result = service.run(
-            credit_score_rules=references["credit_score_rules"],
-            cic_metric_specs=references["cic_metric_specs"],
-            enterprise_cic_metrics=EnterpriseCICMetrics(**payload),
-            enterprise_profile=enterprise_profile,
+        result = run_risk_review_from_file(
+            input_file=args.input_file,
+            dataset_dir=args.dataset_dir,
         )
         print(result.report_text)
         return
 
-    if args.mode == "qwen":
-        service, payload = build_qwen_loan_advisory_pipeline(
-            dataset_dir=args.dataset_dir,
-            customer_id=args.customer_id,
-        )
-    else:
-        service, payload = build_demo_loan_advisory_pipeline(
-            dataset_dir=args.dataset_dir,
-            customer_id=args.customer_id,
-        )
-
-    result = service.run(
-        enterprise_profile=payload["enterprise_profile"],
-        credit_score_rules=payload["credit_score_rules"],
-        cic_metric_specs=payload["cic_metric_specs"],
-        enterprise_cic_metrics=payload["enterprise_cic_metrics"],
+    result = run_loan_advisory(
+        mode=args.mode,
+        dataset_dir=args.dataset_dir,
+        customer_id=args.customer_id,
     )
 
     print(result.report.report_text)

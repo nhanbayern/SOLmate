@@ -4,13 +4,8 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from app.pipeline import (
-    build_demo_loan_advisory_service,
-    build_qwen_loan_advisory_service,
-    build_risk_review_service,
-    load_loan_advisory_payload,
-    load_risk_review_payload,
-)
+from app.pipeline import build_demo_loan_advisory_service, build_qwen_loan_advisory_service
+from app.report_runner import run_loan_advisory, run_risk_review
 from app.schemas.loan_models import EnterpriseCICMetrics, EnterpriseProfile, RiskReviewResult
 
 
@@ -67,7 +62,12 @@ class RiskReviewResponse(BaseModel):
     report_text: str
 
 
-def _make_service(mode: str, dataset_dir: str):
+class ReportTextResponse(BaseModel):
+    customer_id: str
+    report_text: str
+
+
+def _make_service(mode: str):
     if mode == "qwen":
         return build_qwen_loan_advisory_service()
     if mode == "demo":
@@ -76,8 +76,8 @@ def _make_service(mode: str, dataset_dir: str):
 
 
 @lru_cache(maxsize=4)
-def get_service(mode: str, dataset_dir: str):
-    return _make_service(mode=mode, dataset_dir=dataset_dir)
+def get_service(mode: str):
+    return _make_service(mode=mode)
 
 
 app = FastAPI(
@@ -92,47 +92,12 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/advisory", response_model=AdvisoryResponse)
-def generate_advisory(request: AdvisoryRequest) -> AdvisoryResponse:
-    try:
-        service = get_service(mode=request.mode, dataset_dir=request.dataset_dir)
-        payload = load_loan_advisory_payload(
-            dataset_dir=request.dataset_dir,
-            customer_id=request.customer_id,
-        )
-        result = service.run(
-            enterprise_profile=payload["enterprise_profile"],
-            credit_score_rules=payload["credit_score_rules"],
-            cic_metric_specs=payload["cic_metric_specs"],
-            enterprise_cic_metrics=payload["enterprise_cic_metrics"],
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return AdvisoryResponse(
-        customer_id=result.enterprise_profile.customer_id,
-        mode=request.mode,
-        report_text=result.report.report_text,
-        recommendation=result.report.recommendation,
-        summary=result.report.summary,
-    )
-
-
 @app.post("/risk-review", response_model=RiskReviewResponse)
 def review_risk_input(request: RiskReviewRequest) -> RiskReviewResponse:
     try:
-        service = build_risk_review_service()
-        references = load_risk_review_payload(dataset_dir=request.dataset_dir)
-        enterprise_cic_metrics = EnterpriseCICMetrics(
-            **request.model_dump(exclude={"dataset_dir", "enterprise_profile"})
-        )
-        result: RiskReviewResult = service.run(
-            credit_score_rules=references["credit_score_rules"],
-            cic_metric_specs=references["cic_metric_specs"],
-            enterprise_cic_metrics=enterprise_cic_metrics,
-            enterprise_profile=request.enterprise_profile,
+        result: RiskReviewResult = run_risk_review(
+            payload=request.model_dump(exclude={"dataset_dir"}),
+            dataset_dir=request.dataset_dir,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -155,5 +120,23 @@ def review_risk_input(request: RiskReviewRequest) -> RiskReviewResponse:
         bank_advice=result.bank_advice,
         findings=result.review.findings,
         next_actions=result.next_actions,
+        report_text=result.report_text,
+    )
+
+
+@app.post("/risk-review/report-text", response_model=ReportTextResponse)
+def review_risk_input_report_text(request: RiskReviewRequest) -> ReportTextResponse:
+    try:
+        result: RiskReviewResult = run_risk_review(
+            payload=request.model_dump(exclude={"dataset_dir"}),
+            dataset_dir=request.dataset_dir,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return ReportTextResponse(
+        customer_id=result.risk_assessment.customer_id,
         report_text=result.report_text,
     )
