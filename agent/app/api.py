@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.pipeline import (
     build_demo_loan_advisory_service,
-    build_dense_milvus_loan_advisory_service,
+    build_qwen_loan_advisory_service,
     build_risk_review_service,
     load_loan_advisory_payload,
     load_risk_review_payload,
@@ -19,13 +19,13 @@ class AdvisoryRequest(BaseModel):
         default=None,
         description="Customer ID to evaluate. If omitted, the first record in the dataset is used.",
     )
-    mode: Literal["demo", "milvus-dense"] = Field(
-        default="milvus-dense",
-        description="Retrieval mode.",
+    mode: Literal["demo", "qwen"] = Field(
+        default="qwen",
+        description="Advisory generation mode.",
     )
     dataset_dir: str = Field(
         default="dataset",
-        description="Directory containing enterprise, CIC, and legal JSON files.",
+        description="Directory containing enterprise and CIC JSON files.",
     )
 
 
@@ -68,10 +68,10 @@ class RiskReviewResponse(BaseModel):
 
 
 def _make_service(mode: str, dataset_dir: str):
-    if mode == "milvus-dense":
-        return build_dense_milvus_loan_advisory_service(dataset_dir=dataset_dir)
+    if mode == "qwen":
+        return build_qwen_loan_advisory_service()
     if mode == "demo":
-        return build_demo_loan_advisory_service(dataset_dir=dataset_dir)
+        return build_demo_loan_advisory_service()
     raise ValueError(f"Unsupported mode '{mode}'.")
 
 

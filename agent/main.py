@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app.pipeline import (
     build_demo_loan_advisory_pipeline,
-    build_dense_milvus_loan_advisory_pipeline,
+    build_qwen_loan_advisory_pipeline,
     build_risk_review_service,
     load_risk_review_payload,
 )
@@ -19,14 +19,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run the loan advisory pipeline.")
     parser.add_argument(
         "--mode",
-        choices=["demo", "milvus-dense", "risk-review"],
+        choices=["demo", "qwen", "risk-review"],
         default="risk-review",
         help="Pipeline mode to run.",
     )
     parser.add_argument(
         "--dataset-dir",
         default="dataset",
-        help="Dataset directory containing enterprise and legal JSON files.",
+        help="Dataset directory containing enterprise and CIC JSON files.",
     )
     parser.add_argument(
         "--customer-id",
@@ -58,8 +58,8 @@ def main() -> None:
         print(result.report_text)
         return
 
-    if args.mode == "milvus-dense":
-        service, payload = build_dense_milvus_loan_advisory_pipeline(
+    if args.mode == "qwen":
+        service, payload = build_qwen_loan_advisory_pipeline(
             dataset_dir=args.dataset_dir,
             customer_id=args.customer_id,
         )

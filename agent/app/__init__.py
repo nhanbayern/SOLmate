@@ -1,1 +1,1 @@
-"""Application package for the Vietnamese legal RAG system."""
+"""Application package for the Vietnamese loan advisory system."""

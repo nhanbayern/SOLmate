@@ -45,14 +45,6 @@ class LoanRiskEngine:
             f"{enterprise_cic_metrics.credit_score:.2f}, thuoc muc {matched_rule.level}, "
             f"rui ro mo hinh {normalized_risk_class} ({risk_probability:.2f})."
         )
-        advisory_query = self._build_advisory_query(
-            enterprise_profile=enterprise_profile,
-            matched_rule=matched_rule,
-            risk_class=normalized_risk_class,
-            metric_insights=metric_insights,
-            top_risk_factors=top_risk_factors,
-        )
-
         return RiskAssessmentResult(
             customer_id=enterprise_profile.customer_id,
             credit_score=enterprise_cic_metrics.credit_score,
@@ -63,7 +55,6 @@ class LoanRiskEngine:
             summary=summary,
             metric_insights=metric_insights,
             top_risk_factors=top_risk_factors,
-            advisory_query=advisory_query,
         )
 
     def review_reasonableness(
@@ -335,28 +326,6 @@ class LoanRiskEngine:
         if matched_rule.decision == "APPROVE" and risk_class in safe_classes and risk_probability < 0.50:
             return "APPROVE_WITH_CONDITIONS"
         return "MANUAL_REVIEW"
-
-    def _build_advisory_query(
-        self,
-        enterprise_profile: EnterpriseProfile,
-        matched_rule: CreditScoreRule,
-        risk_class: str,
-        metric_insights: list[RiskFactor],
-        top_risk_factors: list[RiskFactor],
-    ) -> str:
-        years_text = str(enterprise_profile.years_in_business or "khong ro")
-        focus_metrics = ", ".join(item.name for item in top_risk_factors[:4]) or ", ".join(
-            item.name for item in metric_insights[:4]
-        )
-        return (
-            "quy dinh cap tin dung cho doanh nghiep, dieu kien tham dinh ho so vay, "
-            f"doanh nghiep nganh {enterprise_profile.industry or 'khong ro'}, "
-            f"loai hinh {enterprise_profile.business_type or 'khong ro'}, "
-            f"so nam hoat dong la {years_text}, "
-            f"credit score muc {matched_rule.level}, "
-            f"risk class {risk_class}, "
-            f"cac chi so CIC can luu y la: {focus_metrics}"
-        )
 
     def _credit_rule_probability_anchor(self, matched_level: str) -> float:
         anchors = {

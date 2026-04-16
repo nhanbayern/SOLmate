@@ -1,1 +1,1 @@
-"""Vietnamese legal text preprocessing."""
+"""Text preprocessing utilities."""

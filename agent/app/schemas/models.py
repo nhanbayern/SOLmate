@@ -26,22 +26,3 @@ class LegalArticle(BaseModel):
     content: str
     metadata: dict[str, str] = Field(default_factory=dict)
     chunk_ids: list[str] = Field(default_factory=list)
-
-
-class QueryVariant(BaseModel):
-    original_text: str
-    rewritten_text: str
-    segmented_text: str
-    bm25_text: str
-    dense_text: str
-    retrieval_units: list[str] = Field(default_factory=list)
-
-
-class RetrievalResult(BaseModel):
-    chunk_id: str
-    article_id: str
-    text: str
-    bm25_score: float = 0.0
-    dense_score: float = 0.0
-    combined_score: float = 0.0
-    metadata: ChunkMetadata | None = None

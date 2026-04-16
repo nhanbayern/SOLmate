@@ -1,6 +1,6 @@
 # Vietnamese Loan Risk Review
 
-This project now supports a risk-only review flow for Vietnamese business loan screening.
+This project supports loan advisory and risk review flows for Vietnamese business loan screening.
 
 The current flow:
 
@@ -106,4 +106,4 @@ Where `sample.json` contains the same direct CIC payload as above.
   - the matched credit score rule
   - the severity of the CIC metrics
   - the `regime` signal when present
-- Legal retrieval files remain in the repository, but they are not required for the new `risk-review` flow.
+- The current advisory flow does not depend on legal-text retrieval.

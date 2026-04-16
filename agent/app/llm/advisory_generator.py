@@ -2,26 +2,9 @@ import re
 
 from app.core.prompts import LOAN_ADVISORY_PROMPT_TEMPLATE
 from app.schemas.loan_models import AdvisoryReport, EnterpriseProfile, RiskAssessmentResult
-from app.schemas.models import LegalArticle
 
 
-_SECTION_LABELS = {
-    "Risk Overview": "risk_overview",
-    "Legal Basis": "legal_basis",
-    "Missing Information": "missing_information",
-    "Recommendation": "recommendation",
-    "Suggested Next Actions": "suggested_actions",
-}
-_SECTION_PATTERN = re.compile(
-    r"(?ims)^\s*(?P<label>Risk Overview|Legal Basis|Missing Information|Recommendation|Suggested Next Actions)\s*:\s*(?P<content>.*?)(?=^\s*(?:Risk Overview|Legal Basis|Missing Information|Recommendation|Suggested Next Actions)\s*:|\Z)"
-)
-
-
-def _build_legal_basis_refs(legal_articles: list[LegalArticle]) -> list[str]:
-    return [
-        f"{article.metadata.get('document_id', article.article_id)} - {article.metadata.get('section_path', article.title)}"
-        for article in legal_articles
-    ]
+_RECOMMENDATION_PATTERN = re.compile(r"(?im)^\s*Quy[ếe]t định:\s*(.+?)\s*$")
 
 
 def _build_key_reasons(
@@ -52,46 +35,13 @@ def _build_missing_information(enterprise_profile: EnterpriseProfile) -> list[st
 
 def _build_suggested_actions(risk_assessment: RiskAssessmentResult) -> list[str]:
     suggested_actions = [
-        "Đối chiếu thêm hồ sơ tài chính và tài sản bảo đảm trước khi phê duyệt.",
-        "Kiểm tra lại lịch sử trả nợ CIC và các nghĩa vụ hiện tại của doanh nghiệp.",
+        "Doi chieu dong tien POS voi bien dong vao tai khoan de kiem tra tinh xac thuc cua doanh thu.",
+        "Kiem tra tinh day du, do moi va bat thuong cua bo du lieu giao dich truoc khi phe duyet.",
+        "Ra soat lai cac chi so rui ro noi bat va lap ke hoach giam sat sau giai ngan neu ho so du dieu kien.",
     ]
     if risk_assessment.recommendation == "MANUAL_REVIEW":
         suggested_actions.insert(0, "Chuyen ho so sang tham dinh thu cong bo sung.")
     return suggested_actions
-
-
-def _extract_sections(text: str) -> dict[str, str]:
-    sections: dict[str, str] = {}
-    for match in _SECTION_PATTERN.finditer(text):
-        label = match.group("label").strip()
-        sections[_SECTION_LABELS[label]] = match.group("content").strip()
-    return sections
-
-
-def _parse_list_section(text: str) -> list[str]:
-    cleaned = text.strip()
-    if not cleaned:
-        return []
-
-    normalized = cleaned.lower().strip(". ")
-    if normalized in {"khong co", "khong", "none", "n/a", "khong co thong tin bo sung"}:
-        return []
-
-    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
-    items: list[str] = []
-    for line in lines:
-        line = re.sub(r"^[-*]\s*", "", line)
-        line = re.sub(r"^\d+[.)]\s*", "", line)
-        if line:
-            items.append(line.strip())
-
-    if len(items) > 1:
-        return items
-
-    if ";" in cleaned:
-        return [part.strip() for part in cleaned.split(";") if part.strip()]
-
-    return items or [cleaned]
 
 
 def _build_summary(recommendation: str, risk_overview: str) -> str:
@@ -103,32 +53,61 @@ def _build_summary(recommendation: str, risk_overview: str) -> str:
 
 
 def _compose_report_text(
-    risk_overview: str,
-    legal_basis: list[str],
+    enterprise_profile: EnterpriseProfile,
+    risk_assessment: RiskAssessmentResult,
     missing_information: list[str],
-    recommendation: str,
     suggested_actions: list[str],
+    recommendation: str,
 ) -> str:
-    sections = [
-        f"Risk Overview: {risk_overview}" if risk_overview else "",
-        (
-            "Legal Basis:\n- " + "\n- ".join(legal_basis)
-            if legal_basis
-            else "Legal Basis: Khong co can cu phap ly phu hop."
-        ),
-        (
-            "Missing Information:\n- " + "\n- ".join(missing_information)
-            if missing_information
-            else "Missing Information: Khong co thong tin thieu noi bat."
-        ),
-        f"Recommendation: {recommendation}" if recommendation else "",
-        (
-            "Suggested Next Actions:\n- " + "\n- ".join(suggested_actions)
-            if suggested_actions
-            else "Suggested Next Actions: Chua co de xuat bo sung."
-        ),
+    enterprise_overview = (
+        f"Doanh nghiep {enterprise_profile.name or enterprise_profile.customer_id} "
+        f"thuoc nganh {enterprise_profile.industry or 'chua ro'}, "
+        f"loai hinh {enterprise_profile.business_type or 'chua ro'}, "
+        f"hoat dong tai {enterprise_profile.location or 'chua ro'}."
+    )
+    risk_lines = [
+        f"- Credit score: {risk_assessment.credit_score:.2f}",
+        f"- Risk class: {risk_assessment.risk_class}",
+        f"- Risk probability: {risk_assessment.risk_probability:.2f}",
     ]
-    return "\n\n".join(section for section in sections if section)
+    risk_lines.extend(
+        f"- {factor.name}: {factor.value} ({factor.note})"
+        for factor in (risk_assessment.top_risk_factors or risk_assessment.metric_insights)[:3]
+    )
+
+    missing_lines = (
+        "\n".join(f"- {item}" for item in missing_information)
+        if missing_information
+        else "- Khong co thong tin thieu noi bat."
+    )
+    action_lines = "\n".join(f"- {item}" for item in suggested_actions)
+
+    return "\n".join(
+        [
+            "### 1. Tong quan khach hang",
+            enterprise_overview,
+            "",
+            "### 2. Danh gia rui ro",
+            "\n".join(risk_lines),
+            "",
+            "### 4. Thong tin con thieu",
+            missing_lines,
+            "",
+            "### 5. Khuyen nghi",
+            f"Quyet dinh: {recommendation}",
+            f"Ly do chinh: {risk_assessment.summary}",
+            "",
+            "### 6. De xuat hanh dong",
+            action_lines,
+        ]
+    )
+
+
+def _extract_recommendation(text: str) -> str:
+    match = _RECOMMENDATION_PATTERN.search(text)
+    if not match:
+        return ""
+    return match.group(1).strip()
 
 
 class MockLoanAdvisoryGenerator:
@@ -136,26 +115,23 @@ class MockLoanAdvisoryGenerator:
         self,
         enterprise_profile: EnterpriseProfile,
         risk_assessment: RiskAssessmentResult,
-        legal_articles: list[LegalArticle],
     ) -> AdvisoryReport:
-        legal_basis = _build_legal_basis_refs(legal_articles)
         key_reasons = _build_key_reasons(enterprise_profile, risk_assessment)
         missing_information = _build_missing_information(enterprise_profile)
         suggested_actions = _build_suggested_actions(risk_assessment)
         summary = _build_summary(risk_assessment.recommendation, risk_assessment.summary)
         report_text = _compose_report_text(
-            risk_overview=risk_assessment.summary,
-            legal_basis=legal_basis,
+            enterprise_profile=enterprise_profile,
+            risk_assessment=risk_assessment,
             missing_information=missing_information,
-            recommendation=risk_assessment.recommendation,
             suggested_actions=suggested_actions,
+            recommendation=risk_assessment.recommendation,
         )
 
         return AdvisoryReport(
             recommendation=risk_assessment.recommendation,
             summary=summary,
             risk_overview=risk_assessment.summary,
-            legal_basis=legal_basis,
             key_reasons=key_reasons,
             missing_information=missing_information,
             suggested_actions=suggested_actions,
@@ -171,11 +147,7 @@ class QwenLoanAdvisoryGenerator:
         self,
         enterprise_profile: EnterpriseProfile,
         risk_assessment: RiskAssessmentResult,
-        legal_articles: list[LegalArticle],
     ) -> AdvisoryReport:
-        legal_context = "\n\n".join(
-            f"{article.title}\n{article.content}" for article in legal_articles
-        )
         metric_summary = "\n".join(
             f"- {item.name}: {item.value} ({item.note})" for item in risk_assessment.metric_insights
         )
@@ -183,41 +155,27 @@ class QwenLoanAdvisoryGenerator:
             enterprise_profile=enterprise_profile.model_dump_json(indent=2),
             risk_assessment=risk_assessment.model_dump_json(indent=2),
             metric_summary=metric_summary or "- Khong co metric insight.",
-            legal_context=legal_context or "Khong co van ban phap ly phu hop.",
         )
         text = self.llm_client.generate(prompt, max_new_tokens=256).strip()
-        sections = _extract_sections(text)
 
-        legal_basis = _parse_list_section(sections.get("legal_basis", "")) or _build_legal_basis_refs(
-            legal_articles
-        )
-        missing_information = _parse_list_section(
-            sections.get("missing_information", "")
-        ) or _build_missing_information(enterprise_profile)
-        recommendation = sections.get("recommendation", "").strip() or risk_assessment.recommendation
-        risk_overview = sections.get("risk_overview", "").strip() or risk_assessment.summary
-        suggested_actions = _parse_list_section(
-            sections.get("suggested_actions", "")
-        ) or _build_suggested_actions(risk_assessment)
+        recommendation = _extract_recommendation(text) or risk_assessment.recommendation
+        risk_overview = risk_assessment.summary
+        missing_information = _build_missing_information(enterprise_profile)
+        suggested_actions = _build_suggested_actions(risk_assessment)
         summary = _build_summary(recommendation, risk_overview)
         key_reasons = _build_key_reasons(enterprise_profile, risk_assessment)
-        report_text = (
-            text
-            if len(sections) == len(_SECTION_LABELS)
-            else _compose_report_text(
-                risk_overview=risk_overview,
-                legal_basis=legal_basis,
-                missing_information=missing_information,
-                recommendation=recommendation,
-                suggested_actions=suggested_actions,
-            )
+        report_text = text or _compose_report_text(
+            enterprise_profile=enterprise_profile,
+            risk_assessment=risk_assessment,
+            missing_information=missing_information,
+            suggested_actions=suggested_actions,
+            recommendation=recommendation,
         )
 
         return AdvisoryReport(
             recommendation=recommendation,
             summary=summary,
             risk_overview=risk_overview,
-            legal_basis=legal_basis,
             key_reasons=key_reasons,
             missing_information=missing_information,
             suggested_actions=suggested_actions,
