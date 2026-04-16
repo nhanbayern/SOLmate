@@ -5,6 +5,7 @@ import (
 	"backend/internal/infrastructure"
 	"backend/internal/models"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -245,6 +246,8 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 	}
 
 	var reportText string
+	var recommendation string
+
 	agentRes, err := s.agentService.ReviewRisk(ctx, agentReq)
 	if err != nil {
 		s.log.Warn(
@@ -259,8 +262,10 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 		)
 
 		reportText = "AI Agent hiện không khả dụng để phân tích báo cáo chi tiết."
+		recommendation = "UNAVAILABLE"
 	} else {
 		reportText = agentRes.ReportText
+		recommendation = agentRes.Recommendation
 	}
 
 	dbCtx, dbCancel := context.WithTimeout(ctx, s.cfg.DBTimeout)
@@ -279,12 +284,20 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 		return fmt.Errorf("update db: %w", err)
 	}
 
-	sseMsg := fmt.Sprintf(
-		`{"type": "EVALUATION_COMPLETED", "loan_id": %d, "merchant_id": "%s", "customer_id": "%s", "score": %d, "risk_label": "%s", "pd_value": %.4f}`,
-		loanID, merchantID, customerID, score, riskLabel, pdValue,
-	)
+	ssePayload := map[string]any{
+		"type":           "EVALUATION_COMPLETED",
+		"loan_id":        loanID,
+		"merchant_id":    merchantID,
+		"customer_id":    customerID,
+		"score":          score,
+		"risk_label":     riskLabel,
+		"pd_value":       pdValue,
+		"recommendation": recommendation,
+		"report_text":    reportText,
+	}
+	sseBytes, _ := json.Marshal(ssePayload)
 
-	if err := s.redisRepo.PublishUpdate(ctx, merchantID, sseMsg); err != nil {
+	if err := s.redisRepo.PublishUpdate(ctx, merchantID, string(sseBytes)); err != nil {
 		s.log.Warn(
 			"Publish SSE update failed",
 			"merchant_id", merchantID,
