@@ -30,9 +30,11 @@ func NewAgentService(cfg config.AgentServiceConfig) *AgentService {
 }
 
 func (s *AgentService) ReviewRisk(ctx context.Context, reqData models.AgentRiskRequest) (*models.AgentRiskResponse, error) {
+	customerID := reqData.EnterpriseCICMetrics.CustomerID
+
 	s.log.Debug(
 		"Agent review started",
-		"customer_id", reqData.CustomerID,
+		"customer_id", customerID,
 	)
 
 	reqCtx, reqCancel := context.WithTimeout(ctx, s.cfg.Timeout)
@@ -42,17 +44,17 @@ func (s *AgentService) ReviewRisk(ctx context.Context, reqData models.AgentRiskR
 	if err != nil {
 		s.log.Error(
 			"Marshal request data failed",
-			"customer_id", reqData.CustomerID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
-		return nil, fmt.Errorf("marshal request: %w", &err)
+		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, s.cfg.AgentURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		s.log.Error(
 			"Create http request failed",
-			"customer_id", reqData.CustomerID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 		return nil, fmt.Errorf("create request: %w", err)
@@ -63,7 +65,7 @@ func (s *AgentService) ReviewRisk(ctx context.Context, reqData models.AgentRiskR
 	if err != nil {
 		s.log.Error(
 			"Execute http request failed",
-			"customer_id", reqData.CustomerID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 		return nil, fmt.Errorf("execute request: %w", err)
@@ -74,7 +76,7 @@ func (s *AgentService) ReviewRisk(ctx context.Context, reqData models.AgentRiskR
 	if err != nil {
 		s.log.Error(
 			"Read response body failed",
-			"customer_id", reqData.CustomerID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 		return nil, fmt.Errorf("read response body: %w", err)
@@ -84,7 +86,7 @@ func (s *AgentService) ReviewRisk(ctx context.Context, reqData models.AgentRiskR
 	if err := json.Unmarshal(bodyBytes, &agentRes); err != nil {
 		s.log.Error(
 			"Unmarshal agent response failed",
-			"customer_id", reqData.CustomerID,
+			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 		return nil, fmt.Errorf("unmarshal response: %w", err)
@@ -92,8 +94,7 @@ func (s *AgentService) ReviewRisk(ctx context.Context, reqData models.AgentRiskR
 
 	s.log.Info(
 		"Agent review completed successfully",
-		"customer_id", reqData.CustomerID,
-		"expected_risk_class", agentRes.ExpectedRiskClass,
+		"customer_id", customerID,
 	)
 
 	return &agentRes, nil

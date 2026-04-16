@@ -17,6 +17,7 @@ import (
 )
 
 type LoanPostgresRepo interface {
+	GetMerchantMetadata(ctx context.Context, id string) (*models.Merchant, error)
 	UpdateLoanAIReport(ctx context.Context, loanID, score int, riskLabel string, pdValue float64, report string) error
 }
 
@@ -208,41 +209,73 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 		"pd_value", fmt.Sprintf("%.4f", pdValue),
 	)
 
-	agentReq := models.AgentRiskRequest{
-		CustomerID:      customerID,
-		CreditScore:     float64(score),
-		RiskClass:       riskLabel,
-		RiskProbability: pdValue,
+	merchantProfile, err := s.pgRepo.GetMerchantMetadata(ctx, merchantID)
+	if err != nil {
+		s.log.Warn(
+			"Fetch merchant profile for agent failed",
+			"merchant_id", merchantID,
+			infrastructure.KeyError, err.Error(),
+		)
+		merchantProfile = &models.Merchant{}
+	}
+
+	agentMetrics := models.AgentMetrics{
+		"Revenue_mean_30d": 0.0,
+		"Revenue_mean_90d": 0.0,
+		"Txn_frequency":    0.0,
+		"Growth_value":     0.0,
+		"CV_value":         0.0,
+		"Spike_ratio":      0.0,
+		"regime":           riskLabel,
 	}
 
 	f := merchantData.Features
 
 	if len(f) >= 12 {
-		agentReq.Metrics = models.AgentMetrics{
-			RevenueMean30d: f[0],
-			RevenueMean90d: f[1],
-			TxnFrequency:   f[2],
-			GrowthValue:    f[3],
-			GrowthScore:    f[4],
-			CVValue:        f[5],
-			CVScore:        f[6],
-			SpikeRatio:     f[7],
-			SpikeScore:     f[8],
-			TxnFreqScore:   f[9],
-			YearsScore:     f[10],
-			IndustryScore:  f[11],
-			Regime:         riskLabel,
+		agentMetrics = models.AgentMetrics{
+			"Revenue_mean_30d": f[0],
+			"Revenue_mean_90d": f[1],
+			"Txn_frequency":    f[2],
+			"Growth_value":     f[3],
+			"Growth_score":     f[4],
+			"CV_value":         f[5],
+			"CV_score":         f[6],
+			"Spike_ratio":      f[7],
+			"Spike_score":      f[8],
+			"Txn_freq_score":   f[9],
+			"Years_score":      f[10],
+			"Industry_score":   f[11],
+			"regime":           riskLabel,
 		}
 	} else if len(f) >= 6 {
-		agentReq.Metrics = models.AgentMetrics{
-			RevenueMean30d: f[0],
-			RevenueMean90d: f[1],
-			TxnFrequency:   f[2],
-			GrowthValue:    f[3],
-			CVValue:        f[4],
-			SpikeRatio:     f[5],
-			Regime:         riskLabel,
+		agentMetrics = models.AgentMetrics{
+			"Revenue_mean_30d": f[0],
+			"Revenue_mean_90d": f[1],
+			"Txn_frequency":    f[2],
+			"Growth_value":     f[3],
+			"CV_value":         f[4],
+			"Spike_ratio":      f[5],
+			"regime":           riskLabel,
 		}
+	}
+
+	agentReq := models.AgentRiskRequest{
+		EnterpriseProfile: models.EnterpriseProfile{
+			CustomerID:      customerID,
+			MerchantID:      merchantID,
+			Name:            merchantProfile.Name,
+			Industry:        merchantProfile.Industry,
+			BusinessType:    merchantProfile.BusinessType,
+			YearsInBusiness: float64(merchantProfile.YearsInBusiness),
+			CreatedAt:       merchantProfile.CreatedAt.Format("2006-01-02"),
+		},
+		EnterpriseCICMetrics: models.EnterpriseCICMetrics{
+			CustomerID:      customerID,
+			CreditScore:     float64(score),
+			RiskClass:       riskLabel,
+			RiskProbability: pdValue,
+			Metrics:         agentMetrics,
+		},
 	}
 
 	var reportText string
@@ -264,8 +297,8 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 		reportText = "AI Agent hiện không khả dụng để phân tích báo cáo chi tiết."
 		recommendation = "UNAVAILABLE"
 	} else {
-		reportText = agentRes.ReportText
-		recommendation = agentRes.Recommendation
+		reportText = fmt.Sprintf("Báo cáo Khách hàng:\n%s\n\nBáo cáo Ngân hàng:\n%s", agentRes.ReportTextUser, agentRes.ReportTextBank)
+		recommendation = "EVALUATED"
 	}
 
 	dbCtx, dbCancel := context.WithTimeout(ctx, s.cfg.DBTimeout)

@@ -1,22 +1,20 @@
 package models
 
-type AgentMetrics struct {
-	RevenueMean30d float64 `json:"Revenue_mean_30d"`
-	RevenueMean90d float64 `json:"Revenue_mean_90d"`
-	TxnFrequency   float64 `json:"Txn_frequency"`
-	Regime         string  `json:"regime"`
-	GrowthValue    float64 `json:"Growth_value"`
-	GrowthScore    float64 `json:"Growth_score"`
-	CVValue        float64 `json:"CV_value"`
-	CVScore        float64 `json:"CV_score"`
-	SpikeRatio     float64 `json:"Spike_ratio"`
-	SpikeScore     float64 `json:"Spike_score"`
-	TxnFreqScore   float64 `json:"Txn_freq_score"`
-	YearsScore     float64 `json:"Years_score"`
-	IndustryScore  float64 `json:"Industry_score"`
+type AgentMetrics map[string]any
+
+type EnterpriseProfile struct {
+	CustomerID      string  `json:"customer_id"`
+	MerchantID      string  `json:"merchant_id"`
+	Name            string  `json:"name"`
+	Age             int     `json:"age,omitempty"`
+	Industry        string  `json:"industry"`
+	BusinessType    string  `json:"business_type"`
+	YearsInBusiness float64 `json:"years_in_business"`
+	Location        string  `json:"location,omitempty"`
+	CreatedAt       string  `json:"created_at"`
 }
 
-type AgentRiskRequest struct {
+type EnterpriseCICMetrics struct {
 	CustomerID      string       `json:"customer_id"`
 	CreditScore     float64      `json:"credit_score"`
 	Metrics         AgentMetrics `json:"metrics"`
@@ -24,17 +22,13 @@ type AgentRiskRequest struct {
 	RiskProbability float64      `json:"risk_probability"`
 }
 
+type AgentRiskRequest struct {
+	EnterpriseProfile    EnterpriseProfile    `json:"enterprise_profile"`
+	EnterpriseCICMetrics EnterpriseCICMetrics `json:"enterprise_cic_metrics"`
+}
+
 type AgentRiskResponse struct {
-	CustomerID                  string   `json:"customer_id"`
-	ProvidedRiskClass           string   `json:"provided_risk_class"`
-	ExpectedRiskClass           string   `json:"expected_risk_class"`
-	ProvidedRiskProbability     float64  `json:"provided_risk_probability"`
-	ExpectedRiskProbability     float64  `json:"expected_risk_probability"`
-	ExpectedProbabilityBand     string   `json:"expected_probability_band"`
-	RiskClassIsReasonable       bool     `json:"risk_class_is_reasonable"`
-	RiskProbabilityIsReasonable bool     `json:"risk_probability_is_reasonable"`
-	Recommendation              string   `json:"recommendation"`
-	Summary                     string   `json:"summary"`
-	Findings                    []string `json:"findings"`
-	ReportText                  string   `json:"report_text"`
+	CustomerID     string `json:"customer_id"`
+	ReportTextUser string `json:"report_text_user"`
+	ReportTextBank string `json:"report_text_bank"`
 }
