@@ -1,0 +1,67 @@
+[
+  {
+    "metrics": "Revenue_mean_30d",
+    "value": "",
+    "note": "Doanh thu bình quân ngắn hạn 30 ngày."
+  },
+  {
+    "metrics": "Revenue_mean_90d",
+    "value": "",
+    "note": "Doanh thu bình quân nền dài hơn (90 ngày), dùng làm baseline tăng trưởng."
+  },
+  {
+    "metrics": "Txn_frequency",
+    "value": "",
+    "note": "Tần suất giao dịch POS; đại diện mức độ hoạt động."
+  },
+  {
+    "metrics": "regime",
+    "value": "NORMAL 0.70, HIGH_RISK 0.15, LOW_RISK 0.15.",
+    "note": "Biến ẩn mô phỏng bối cảnh kinh doanh; chi phối cách sinh nhiều feature."
+  },
+  {
+    "metrics": "Growth_value",
+    "value": "(Revenue_mean_30d - Revenue_mean_90d) / Revenue_mean_90d, clipped to [-1, 1].",
+    "note": "Tăng trưởng doanh thu thực (raw growth signal)."
+  },
+  {
+    "metrics": "Growth_score",
+    "value": "Growth_score = (Growth_value + 1) / 2.",
+    "note": "Chuẩn hóa tăng trưởng từ [-1,1] về [0,1]."
+  },
+  {
+    "metrics": "CV_value",
+    "value": "",
+    "note": "Mức biến động dòng tiền (volatility proxy), tín hiệu rủi ro cốt lõi."
+  },
+  {
+    "metrics": "CV_score",
+    "value": "CV_score = 1 - min(CV_value / 0.45, 1.0).",
+    "note": "Điểm ổn định dòng tiền; CV càng cao thì điểm càng thấp."
+  },
+  {
+    "metrics": "Spike_ratio",
+    "value": "",
+    "note": "Mức phụ thuộc vào đột biến doanh thu."
+  },
+  {
+    "metrics": "Spike_score",
+    "value": "Spike_score = max(0, 1 - (Spike_ratio - 1.0) / 1.2).",
+    "note": "Điểm ổn định theo khía cạnh spike; spike_ratio thấp thì điểm cao."
+  },
+  {
+    "metrics": "Txn_freq_score",
+    "value": "log(1 + Txn_frequency) / log(81).",
+    "note": "Điểm hóa tần suất giao dịch về [0,1] theo log scale."
+  },
+  {
+    "metrics": "Years_score",
+    "value": "Years_score = min(years_in_business / 15, 1.0).",
+    "note": "Điểm phản ánh độ trưởng thành vận hành."
+  },
+  {
+    "metrics": "Industry_score",
+    "value": "",
+    "note": "Điểm rủi ro cấu trúc theo ngành kinh doanh."
+  }
+]

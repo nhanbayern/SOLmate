@@ -1,0 +1,106 @@
+Bắt đầu từ công thức gốc:
+
+Hạn mức tín dụng (CL_i) = Nhu cầu vốn lưu động kế hoạch (WCN_i) – (Vốn lưu động ròng (NWC_i) + Nguồn vốn khác (OF_i))
+
+Bước 1: Xấp xỉ Nhu cầu vốn lưu động kế hoạch (WCN)
+
+WCN phản ánh lượng vốn cần để duy trì và mở rộng hoạt động kinh doanh, nên được suy ra từ:
+
+Quy mô doanh thu: Revenue_mean_30d, Revenue_mean_90d
+Tăng trưởng: Growth_value hoặc Growth_score
+Tần suất giao dịch: Txn_frequency
+
+Suy ra:
+
+WCN_i = β1 * Revenue_mean_30d_i
++ β2 * Revenue_mean_90d_i
++ β3 * Growth_value_i
+- β4 * Txn_frequency_i
+
+Bước 2: Xấp xỉ Vốn lưu động ròng (NWC)
+
+NWC phản ánh khả năng tự tài trợ nội tại, được proxy bởi độ ổn định dòng tiền:
+
+CV_value (biến động)
+Spike_ratio (biến động bất thường)
+regime (ổn định / không ổn định)
+
+Suy ra:
+
+NWC_i = γ1 * (1 - CV_value_i)
++ γ2 * (1 - Spike_ratio_i)
++ γ3 * RegimeScore_i
+
+Bước 3: Xấp xỉ Nguồn vốn khác (OF)
+
+Nguồn vốn khác phản ánh khả năng tiếp cận vốn ngoài ngân hàng:
+
+CIC_SCORE (lịch sử tín dụng)
+Years_score (số năm hoạt động)
+Industry_score (chất lượng ngành)
+
+Suy ra:
+
+OF_i = δ1 * CIC_SCORE_i
++ δ2 * Years_score_i
++ δ3 * Industry_score_i
+
+Bước 4: Thay tất cả vào công thức gốc
+
+CL_i = WCN_i - (NWC_i + OF_i)
+
+= β1 * Revenue_mean_30d_i
+
+β2 * Revenue_mean_90d_i
+β3 * Growth_value_i
+β4 * Txn_frequency_i
+γ1 * (1 - CV_value_i)
+γ2 * (1 - Spike_ratio_i)
+γ3 * RegimeScore_i
+δ1 * CIC_SCORE_i
+δ2 * Years_score_i
+δ3 * Industry_score_i
+
+Bước 5: Chuyển về dạng regression chuẩn (dùng score đã normalize)
+
+Thay các biến raw bằng score:
+
+Growth_value → Growth_score
+Txn_frequency → Txn_freq_score
+CV_value → CV_score
+Spike_ratio → Spike_score
+
+Đồng thời bổ sung yếu tố rủi ro trực tiếp:
+
+default_probability
+
+Bước 6: Regression cuối cùng
+
+CL_i = β1 * Revenue_mean_90d_i
++ β2 * Growth_score_i
++ β3 * Txn_freq_score_i
+- β4 * CV_score_i
+- β5 * Spike_score_i
+- β6 * default_probability_i
+- β7 * CIC_SCORE_i
+
+Diễn giải kinh tế:
+
+Revenue_mean_90d: đại diện quy mô ổn định → tăng hạn mức
+Growth_score: doanh nghiệp tăng trưởng → cần thêm vốn
+Txn_freq_score: vòng quay vốn nhanh → hỗ trợ tăng hạn mức
+CV_score, Spike_score: biến động cao → giảm hạn mức
+default_probability: rủi ro vỡ nợ → giảm mạnh hạn mức
+CIC_SCORE: đã có khả năng vay nơi khác → giảm nhu cầu tại ngân hàng
+
+
+
+Bộ 1 (Conservative): β = (1.5, 0.3, 0.2, 0.6, 0.5, 1.2, 0.4) → ưu tiên an toàn, penalize mạnh rủi ro và biến động.
+
+Bộ 2 (Balanced): β = (2.5, 0.6, 0.4, 0.5, 0.4, 1.0, 0.3) → cân bằng giữa tăng trưởng và rủi ro.
+
+Bộ 3 (Growth-driven): β = (3.5, 1.2, 0.8, 0.3, 0.2, 0.8, 0.2) → ưu tiên tăng trưởng, chấp nhận rủi ro cao hơn.
+
+Bộ 4 (Stability-focused): β = (2.2, 0.4, 0.3, 0.9, 0.8, 1.0, 0.3) → ưu tiên dòng tiền ổn định, penalize mạnh biến động.
+
+Bộ 5 (Risk-based): β = (2.8, 0.5, 0.4, 0.5, 0.4, 1.5, 0.5) → định hướng theo rủi ro, default_probability chi phối chính.

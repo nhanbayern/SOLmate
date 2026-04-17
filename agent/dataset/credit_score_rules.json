@@ -1,0 +1,42 @@
+[
+  {
+    "min_score": 680,
+    "max_score": 750,
+    "level": "VERY_GOOD",
+    "risk": "VERY_LOW",
+    "decision": "APPROVE_EASILY",
+    "note": "High approval probability, favorable terms"
+  },
+  {
+    "min_score": 570,
+    "max_score": 679,
+    "level": "GOOD",
+    "risk": "LOW",
+    "decision": "APPROVE",
+    "note": "Eligible for loan with relatively low interest"
+  },
+  {
+    "min_score": 431,
+    "max_score": 569,
+    "level": "AVERAGE",
+    "risk": "MEDIUM",
+    "decision": "REVIEW_REQUIRED",
+    "note": "Requires additional verification"
+  },
+  {
+    "min_score": 322,
+    "max_score": 430,
+    "level": "LOW",
+    "risk": "HIGH",
+    "decision": "LIKELY_REJECT",
+    "note": "Low approval probability"
+  },
+  {
+    "min_score": 150,
+    "max_score": 321,
+    "level": "VERY_LOW",
+    "risk": "VERY_HIGH",
+    "decision": "REJECT",
+    "note": "Very high default risk, reject application"
+  }
+]
