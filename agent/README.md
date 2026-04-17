@@ -21,6 +21,12 @@ Start the API:
 uvicorn app.api:app --port 8000
 ```
 
+## Run with Docker:
+
+```bash
+docker compose up --build
+```
+
 Health check:
 
 ```bash
@@ -84,3 +90,4 @@ curl http://localhost:8000/health
   - the severity of the CIC metrics
   - the `regime` signal when present
 - The current advisory flow does not depend on legal-text retrieval.
+- The Docker image is optimized for the current FastAPI risk-review endpoints in `app/api.py`.
