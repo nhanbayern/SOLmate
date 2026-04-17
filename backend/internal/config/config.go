@@ -17,6 +17,8 @@ type Config struct {
 	PostgresUser     string
 	PostgresPassword string
 	PostgresDB       string
+	OnnxLibPath      string
+	OnnxModelPath    string
 
 	ServerStartupTimeout  time.Duration
 	ServerReadTimeout     time.Duration
@@ -68,7 +70,7 @@ func getEnv(key, fallback string) string {
 }
 
 func LoadConfig() *Config {
-	if err := godotenv.Load("../.env"); err != nil {
+	if err := godotenv.Load(".env"); err != nil {
 		slog.Warn(
 			"Env file load failed",
 			"layer", "CONFIG",
@@ -90,7 +92,9 @@ func LoadConfig() *Config {
 		PostgresAddr:     getEnv("POSTGRES_ADDR", "localhost:5432"),
 		PostgresUser:     os.Getenv("POSTGRES_USER"),
 		PostgresPassword: os.Getenv("POSTGRES_PASSWORD"),
-		PostgresDB:       getEnv("POSTGRES_DB", "ticket_db"),
+		PostgresDB:       getEnv("POSTGRES_DB", "solmate_db"),
+		OnnxLibPath:      getEnv("ONNX_LIB_PATH", "./ai_models/onnxruntime.dll"),
+		OnnxModelPath:    getEnv("ONNX_MODEL_PATH", "./ai_models/XGBoost.onnx"),
 
 		ServerStartupTimeout:  ServerStartupTimeout,
 		ServerReadTimeout:     ServerReadTimeout,

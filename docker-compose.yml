@@ -107,6 +107,55 @@ services:
     networks:
       - solmate-network
 
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: api
+    container_name: solmate-api
+    restart: always
+    ports:
+      - "${HOST_PORT:?}:8080"
+    environment:
+      SERVER_PORT: ":8080"
+      POSTGRES_ADDR: postgres:5432
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      REDIS_ADDR: redis:6379
+      AGENT_URL: "http://agent:8000/risk-review/report-text"
+      JWT_SECRET: ${JWT_SECRET:?}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - solmate-network
+    volumes:
+      - ./.env:/app/.env:ro
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: solmate-worker
+    restart: always
+    environment:
+      POSTGRES_ADDR: postgres:5432
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      REDIS_ADDR: redis:6379
+      KAFKA_ADDR: kafka:${KAFKA_INTERNAL_PORT:?}
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - solmate-network
+    volumes:
+      - ./.env:/app/.env:ro
+
 volumes:
   postgres-data:
     name: solmate-postgres-data

@@ -51,9 +51,14 @@ func run() error {
 	authService := services.NewAuthService(userRepo, cfg.ToAuthServiceConfig())
 	dashboardService := services.NewDashboardService(pgRepo, cfg.ToLoanServiceConfig())
 
-	dllPath := "./ai_models/onnxruntime.dll"
-	modelPath := "./ai_models/XGBoost.onnx"
-	loanService, err := services.NewLoanService(pgRepo, redisRepo, agentService, cfg.ToLoanServiceConfig(), dllPath, modelPath)
+	loanService, err := services.NewLoanService(
+		pgRepo,
+		redisRepo,
+		agentService,
+		cfg.ToLoanServiceConfig(),
+		cfg.OnnxLibPath,
+		cfg.OnnxModelPath,
+	)
 	if err != nil {
 		return fmt.Errorf("init loan service: %w", err)
 	}
