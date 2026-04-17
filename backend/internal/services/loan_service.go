@@ -223,10 +223,6 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID string, merchantI
 	}
 
 	agentReq := models.AgentRiskRequest{
-		CustomerID:      customerID,
-		CreditScore:     float64(score),
-		RiskClass:       riskLabel,
-		RiskProbability: pdValue,
 		EnterpriseProfile: models.EnterpriseProfile{
 			CustomerID:      customerID,
 			MerchantID:      merchantID,
@@ -236,12 +232,18 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID string, merchantI
 			YearsInBusiness: float64(merchantProfile.YearsInBusiness),
 			CreatedAt:       merchantProfile.CreatedAt.Format("2006-01-02"),
 		},
+		EnterpriseCICMetrics: models.EnterpriseCICMetrics{
+			CustomerID:      customerID,
+			CreditScore:     float64(score),
+			RiskClass:       riskLabel,
+			RiskProbability: pdValue,
+		},
 	}
 
 	f := merchantData.Features
 
 	if len(f) >= 12 {
-		agentReq.Metrics = models.AgentMetrics{
+		agentReq.EnterpriseCICMetrics.Metrics = models.AgentMetrics{
 			RevenueMean30d: f[0],
 			RevenueMean90d: f[1],
 			TxnFrequency:   f[2],
@@ -257,7 +259,7 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID string, merchantI
 			Regime:         riskLabel,
 		}
 	} else if len(f) >= 6 {
-		agentReq.Metrics = models.AgentMetrics{
+		agentReq.EnterpriseCICMetrics.Metrics = models.AgentMetrics{
 			RevenueMean30d: f[0],
 			RevenueMean90d: f[1],
 			TxnFrequency:   f[2],
@@ -339,7 +341,7 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID string, merchantI
 		Recommendation: recommendation,
 		ReportText:     reportText,
 		Metrics:        merchantData.Features,
-		AgentMetrics:   &agentReq.Metrics,
+		AgentMetrics:   &agentReq.EnterpriseCICMetrics.Metrics,
 	}, nil
 }
 

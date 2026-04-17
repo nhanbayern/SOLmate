@@ -14,9 +14,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	_ "backend/docs"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -76,6 +78,15 @@ func run() error {
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
+	// CORS configuration to allow frontend dev server (port 5173)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 	r.Use(gin.Recovery())
 
 	err = r.SetTrustedProxies([]string{

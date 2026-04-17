@@ -28,13 +28,17 @@ type EnterpriseProfile struct {
 	CreatedAt       string  `json:"created_at"`
 }
 
+type EnterpriseCICMetrics struct {
+	CustomerID      string       `json:"customer_id"`
+	CreditScore     float64      `json:"credit_score"`
+	Metrics         AgentMetrics `json:"metrics"`
+	RiskClass       string       `json:"risk_class"`
+	RiskProbability float64      `json:"risk_probability"`
+}
+
 type AgentRiskRequest struct {
-	CustomerID        string            `json:"customer_id"`
-	CreditScore       float64           `json:"credit_score"`
-	Metrics           AgentMetrics      `json:"metrics"`
-	RiskClass         string            `json:"risk_class"`
-	RiskProbability   float64           `json:"risk_probability"`
-	EnterpriseProfile EnterpriseProfile `json:"enterprise_profile"`
+	EnterpriseProfile    EnterpriseProfile    `json:"enterprise_profile"`
+	EnterpriseCICMetrics EnterpriseCICMetrics `json:"enterprise_cic_metrics"`
 }
 
 type AgentRiskResponse struct {

@@ -1,0 +1,449 @@
+================================================================================
+  SOLmate Backend API Documentation
+  Base URL  : http://localhost:8080
+  Version   : 1.0.0
+  Swagger UI: http://localhost:8080/swagger/index.html
+================================================================================
+
+AUTHENTICATION
+──────────────
+All endpoints under /api/* (except /api/auth/login) require:
+  Header: Authorization: <JWT_TOKEN>
+  (Bearer prefix is optional — both formats accepted)
+
+Token is obtained via POST /api/auth/login
+Token expires in: 24 hours
+JWT algorithm   : HS256
+
+
+================================================================================
+  HEALTH
+================================================================================
+
+GET /ping
+  Auth     : None
+  Response : { "message": "pong", "status": "success" }
+
+
+================================================================================
+  AUTH
+================================================================================
+
+POST /api/auth/login
+  Auth     : None
+  Body     :
+    {
+      "username": "admin",
+      "password": "admin"
+    }
+  Response 200:
+    {
+      "status"       : "success",
+      "message"      : "Logged in successfully",
+      "access_token" : "<JWT_TOKEN>",
+      "data": {
+        "user_id"     : "usr_admin_001",
+        "customer_id" : null,
+        "merchant_id" : null,
+        "merchant"    : null,
+        "role"        : "ADMIN",       -- Roles: ADMIN | BANKER | MERCHANT | CUSTOMER
+        "status"      : "ACTIVE"
+      }
+    }
+  Response 401:
+    { "status": "failed", "error": "Invalid credentials" }
+
+──────────────────────────────────────────────────────────────────────────────
+
+GET /api/auth/me
+  Auth     : Required
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "User profile fetched successfully",
+      "data": {
+        "user_id"     : "usr_admin_001",
+        "customer_id" : null,
+        "merchant_id" : null,
+        "merchant"    : null,
+        "role"        : "ADMIN",
+        "status"      : "ACTIVE"
+      }
+    }
+
+
+================================================================================
+  LOANS  (Banker Dashboard)
+================================================================================
+
+GET /api/loans
+  Auth     : Required
+  Query    :
+    limit  (int, default 10)
+    offset (int, default 0)
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "Loan requests fetched successfully",
+      "data"    : [ <LoanRequest>, ... ]
+    }
+
+  LoanRequest object:
+    {
+      "id"               : "LOAN20260417152817user19096",
+      "merchant_id"      : "MER_52153584",
+      "customer_id"      : "CUST_68057522",
+      "loan_type"        : "Khoản vay SME nhỏ",
+      "requested_amount" : 50000.00,
+      "ai_score"         : 720,
+      "risk_label"       : "GOOD",   -- VERY_GOOD | GOOD | MEDIUM | POOR | VERY_POOR
+      "pd_value"         : 0.12,
+      "ai_agent_report"  : "Báo cáo Khách hàng:\n...\n\nBáo cáo Ngân hàng:\n...",
+      "status"           : "PENDING",  -- PENDING | APPROVED | REJECTED
+      "created_at"       : "2026-04-17T15:28:17Z",
+      "updated_at"       : "2026-04-17T15:28:17Z"
+    }
+
+──────────────────────────────────────────────────────────────────────────────
+
+GET /api/loans/:id
+  Auth     : Required
+  Path     : id = Loan Request ID
+  Response 200:
+    { "status": "success", "message": "Loan request fetched successfully", "data": <LoanRequest> }
+  Response 404:
+    { "status": "failed", "error": "Loan request not found" }
+
+──────────────────────────────────────────────────────────────────────────────
+
+POST /api/loans/:id/decision
+  Auth     : Required
+  Path     : id = Loan Request ID
+  Body     :
+    {
+      "status": "APPROVED"   -- APPROVED | REJECTED (required)
+    }
+  Response 200:
+    { "status": "success", "message": "Loan decision applied successfully" }
+  Response 400:
+    { "status": "failed", "error": "Invalid request payload" }
+  Response 404:
+    { "status": "error", "error": "Update loan status failed" }
+
+──────────────────────────────────────────────────────────────────────────────
+
+POST /api/loans/evaluate
+  Auth     : Required
+  Note     : Trigger AI evaluation (XGBoost ONNX model + Agent report)
+  Body     :
+    {
+      "loan_id"     : "LOAN20260417152817user19096",
+      "merchant_id" : "MER_52153584",
+      "customer_id" : "CUST_68057522"
+    }
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "Loan evaluated successfully",
+      "data": {
+        "loan_id"        : "LOAN20260417152817user19096",
+        "merchant_id"    : "MER_52153584",
+        "customer_id"    : "CUST_68057522",
+        "score"          : 720,
+        "risk_label"     : "GOOD",
+        "pd_value"       : 0.1234,
+        "recommendation" : "EVALUATED",   -- EVALUATED | UNAVAILABLE
+        "report_text"    : "Báo cáo Khách hàng:\n...\n\nBáo cáo Ngân hàng:\n...",
+        "metrics"        : [5000.5, 4500.2, 10, 1.2, 0.8, 0.1, 0.9, 1.5, 0.7, 0.8, 0.6, 0.5],
+        "agent_metrics"  : {
+          "Revenue_mean_30d" : 5000.5,
+          "Revenue_mean_90d" : 4500.2,
+          "Txn_frequency"    : 10,
+          "regime"           : "GOOD",
+          "Growth_value"     : 1.2,
+          "Growth_score"     : 0.8,
+          "CV_value"         : 0.1,
+          "CV_score"         : 0.9,
+          "Spike_ratio"      : 1.5,
+          "Spike_score"      : 0.7,
+          "Txn_freq_score"   : 0.8,
+          "Years_score"      : 0.6,
+          "Industry_score"   : 0.5
+        }
+      }
+    }
+
+──────────────────────────────────────────────────────────────────────────────
+
+GET /api/loans/stream
+  Auth       : Required
+  Query      : merchant_id (string, required)
+  Protocol   : Server-Sent Events (SSE)
+  MIME       : text/event-stream
+  Event name : status_update
+  Usage      :
+    const es = new EventSource(
+      "http://localhost:8080/api/loans/stream?merchant_id=MER_52153584",
+      { headers: { Authorization: "<token>" } }
+    );
+    es.addEventListener("status_update", (e) => {
+      const payload = JSON.parse(e.data);
+      // payload types:
+      // 1. EVALUATION_COMPLETED:
+      //    { type, loan_id, merchant_id, customer_id, score, risk_label, pd_value, recommendation, report_text }
+      // 2. ERROR:
+      //    { type: "ERROR", merchant_id, customer_id, reason, timestamp }
+    });
+
+
+================================================================================
+  MERCHANTS  (Banker Dashboard)
+================================================================================
+
+GET /api/merchants
+  Auth     : Required
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "Merchants fetched successfully",
+      "data"    : [ <Merchant>, ... ]
+    }
+
+  Merchant object:
+    {
+      "id"               : "MER_52153584",
+      "name"             : "Cửa hàng ABC",
+      "business_type"    : "Bán lẻ",
+      "industry"         : "Thực phẩm",
+      "years_in_business": 5,
+      "owner_name"       : "Nguyễn Văn A",
+      "kyc_status"       : "VERIFIED",
+      "created_at"       : "2024-01-15T00:00:00Z",
+      "updated_at"       : "2026-04-17T00:00:00Z"
+    }
+
+──────────────────────────────────────────────────────────────────────────────
+
+GET /api/merchants/:id
+  Auth     : Required
+  Path     : id = Merchant ID
+  Response 200:
+    { "status": "success", "message": "Merchant fetched successfully", "data": <Merchant> }
+  Response 404:
+    { "status": "failed", "error": "Merchant not found" }
+
+
+================================================================================
+  TRANSACTIONS  (Banker Dashboard)
+================================================================================
+
+GET /api/transactions
+  Auth     : Required
+  Query    :
+    merchant_id (string, required)
+    customer_id (string, required)
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "Transactions fetched successfully",
+      "data"    : [ <TransactionLog>, ... ]
+    }
+
+  TransactionLog object:
+    {
+      "id"               : 1,
+      "merchant_id"      : "MER_52153584",
+      "customer_id"      : "CUST_68057522",
+      "amount"           : 1500000.00,
+      "is_refund"        : false,
+      "pos_terminal_id"  : "POS_001",
+      "transaction_time" : "2026-04-17T10:30:00Z",
+      "created_at"       : "2026-04-17T10:30:00Z"
+    }
+
+
+================================================================================
+  STATS  (Banker Dashboard)
+================================================================================
+
+GET /api/stats
+  Auth     : Required
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "Dashboard stats fetched successfully",
+      "data": {
+        "total_requests"        : 150,
+        "total_approved_amount" : 7500000.00,
+        "approval_rate"         : 0.68,
+        "risk_distribution": {
+          "VERY_GOOD" : 20,
+          "GOOD"      : 45,
+          "MEDIUM"    : 50,
+          "POOR"      : 25,
+          "VERY_POOR" : 10
+        }
+      }
+    }
+
+
+================================================================================
+  CUSTOMER  (Customer-facing)
+================================================================================
+
+GET /api/customer/loans
+  Auth     : Required (Customer JWT)
+  Note     : Returns loans belonging to the logged-in customer (from JWT user_id)
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "Customer loans fetched successfully",
+      "data"    : [ <LoanRequest>, ... ]
+    }
+
+──────────────────────────────────────────────────────────────────────────────
+
+POST /api/customer/loans
+  Auth     : Required (Customer JWT)
+  Body     :
+    {
+      "merchant_id"      : "MER_52153584",
+      "loan_type"        : "Khoản vay SME nhỏ",
+      "requested_amount" : 50000
+    }
+  Allowed loan_type values:
+    - "Khoản vay SME nhỏ"
+    - "Hạn mức tín dụng quay vòng"
+    - "Tài trợ hóa đơn đơn giản"
+    - "Ứng tiền theo doanh thu (MCA)"
+  Response 200:
+    {
+      "status"  : "success",
+      "message" : "Loan request created successfully",
+      "data"    : <LoanRequest>
+    }
+  Response 400:
+    { "status": "failed", "error": "Invalid loan_type. Allowed values are: ..." }
+
+
+================================================================================
+  RISK SCORING THRESHOLDS  (XGBoost Model Output)
+================================================================================
+
+  PD Value (Probability of Default) → Risk Label → Score (0-1000):
+  ┌─────────────────┬────────────┬───────────────┐
+  │ PD Value        │ Risk Label │ Approx Score  │
+  ├─────────────────┼────────────┼───────────────┤
+  │ < 0.10          │ VERY_GOOD  │ 900-1000      │
+  │ 0.10 – 0.25     │ GOOD       │ 750-900       │
+  │ 0.25 – 0.50     │ MEDIUM     │ 500-750       │
+  │ 0.50 – 0.75     │ POOR       │ 250-500       │
+  │ > 0.75          │ VERY_POOR  │ 0-250         │
+  └─────────────────┴────────────┴───────────────┘
+  Score formula: score = (1 - pd_value) * 1000
+
+
+================================================================================
+  ERROR RESPONSE FORMAT  (All endpoints)
+================================================================================
+
+  { "status": "failed" | "error", "error": "<message>" }
+
+  Common HTTP codes:
+    400 Bad Request   — missing/invalid fields
+    401 Unauthorized  — missing or invalid JWT
+    404 Not Found     — resource does not exist
+    500 Internal      — server/database error
+
+
+================================================================================
+  CORS
+================================================================================
+
+  SSE endpoint (/api/loans/stream) has:
+    Access-Control-Allow-Origin: *
+
+  Other endpoints: No explicit CORS headers in current code.
+  → Frontend must run on same origin OR proxy via nginx/vite-proxy.
+
+
+================================================================================
+  USER ROLES
+================================================================================
+
+  ADMIN    — Full access
+  BANKER   — Banker dashboard (loans, merchants, stats, evaluate)
+  MERCHANT — Linked to a merchant_id
+  CUSTOMER — Linked to a customer_id (customer/* routes)
+
+
+================================================================================
+  MOCK DATA  (Hackathon Demo — IDs to use in Swagger)
+================================================================================
+
+  Default admin account:
+    username : admin
+    password : admin
+
+  Merchant IDs (seeded from Kafka worker / existing DB):
+    MER_52153584
+    MER_12345678   (create more via DB seed)
+
+  Customer IDs:
+    CUST_68057522
+    CUST_11223344
+
+  Loan IDs (format: LOAN<YYYYMMDDHHMMSS><user_id>):
+    LOAN20260417152817user19096   ← used in Swagger examples
+
+  Loan types:
+    "Khoản vay SME nhỏ"
+    "Hạn mức tín dụng quay vòng"
+    "Tài trợ hóa đơn đơn giản"
+    "Ứng tiền theo doanh thu (MCA)"
+
+  Loan statuses:
+    PENDING   → after customer creates request
+    APPROVED  → after banker decision
+    REJECTED  → after banker decision
+
+  AI Feature vector (12 values — order matters):
+    [Revenue_mean_30d, Revenue_mean_90d, Txn_frequency,
+     Growth_value, Growth_score, CV_value, CV_score,
+     Spike_ratio, Spike_score, Txn_freq_score, Years_score, Industry_score]
+
+  Default mock features (used when Redis has no data):
+    [5000.5, 4500.2, 10.0, 1.2, 0.8, 0.1, 0.9, 1.5, 0.7, 0.8, 0.6, 0.5]
+
+
+================================================================================
+  QUICK START  (Frontend integration)
+================================================================================
+
+  Server port  : 8080
+  Base URL     : http://localhost:8080
+  Swagger UI   : http://localhost:8080/swagger/index.html
+
+  Step 1 — Login:
+    POST /api/auth/login  →  save access_token
+
+  Step 2 — Use token in all requests:
+    Header: Authorization: <access_token>
+
+  Step 3 — Banker flow:
+    GET  /api/stats           → overview numbers
+    GET  /api/merchants       → list merchants
+    GET  /api/loans           → list all loan requests
+    GET  /api/loans/:id       → loan detail + AI report
+    POST /api/loans/evaluate  → trigger AI scoring
+    POST /api/loans/:id/decision { "status": "APPROVED" } → approve/reject
+
+  Step 4 — Real-time updates:
+    GET /api/loans/stream?merchant_id=MER_xxx  (SSE)
+    → listen for "status_update" events after POST /evaluate
+
+  Step 5 — Customer flow:
+    POST /api/customer/loans  → submit loan request
+    GET  /api/customer/loans  → view own loans
+
+================================================================================

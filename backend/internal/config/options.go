@@ -55,8 +55,8 @@ type LoanServiceConfig struct {
 }
 
 type AgentServiceConfig struct {
-	AgentURL string
-	Timeout  time.Duration
+	AgentURLs []string
+	Timeout   time.Duration
 }
 
 type AuthServiceConfig struct {

@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -10,7 +11,7 @@ import (
 
 type Config struct {
 	ServerPort       string
-	AgentURL         string
+	AgentURLs        []string
 	RedisAddr        string
 	KafkaAddr        string
 	PostgresAddr     string
@@ -86,7 +87,7 @@ func LoadConfig() *Config {
 
 	cfg := &Config{
 		ServerPort:       getEnv("SERVER_PORT", ":8080"),
-		AgentURL:         getEnv("AGENT_URL", "http://localhost:8000/risk-review/report-text"),
+		AgentURLs:        parseAgentURLs(),
 		RedisAddr:        getEnv("REDIS_ADDR", "localhost:6379"),
 		KafkaAddr:        getEnv("KAFKA_ADDR", "localhost:9092"),
 		PostgresAddr:     getEnv("POSTGRES_ADDR", "localhost:5432"),
@@ -215,9 +216,27 @@ func (c *Config) ToLoanServiceConfig() LoanServiceConfig {
 
 func (c *Config) ToAgentServiceConfig() AgentServiceConfig {
 	return AgentServiceConfig{
-		AgentURL: c.AgentURL,
-		Timeout:  c.AgentTimeout,
+		AgentURLs: c.AgentURLs,
+		Timeout:   c.AgentTimeout,
 	}
+}
+
+func parseAgentURLs() []string {
+	if raw := os.Getenv("AGENT_URLS"); raw != "" {
+		urls := strings.Split(raw, ",")
+		var result []string
+		for _, u := range urls {
+			if trimmed := strings.TrimSpace(u); trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+	// Backward compat: fall back to single AGENT_URL
+	fallback := getEnv("AGENT_URL", "http://localhost:8000/risk-review/report-text")
+	return []string{fallback}
 }
 func (c *Config) ToAuthServiceConfig() AuthServiceConfig {
 	return AuthServiceConfig{
