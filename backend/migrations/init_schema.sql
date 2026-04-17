@@ -22,9 +22,10 @@ CREATE TABLE IF NOT EXISTS transaction_logs (
 );
 
 CREATE TABLE IF NOT EXISTS loan_requests (
-  id SERIAL PRIMARY KEY,
+  id VARCHAR(100) PRIMARY KEY,
   merchant_id VARCHAR(50) REFERENCES merchants(id) ON DELETE CASCADE,
   customer_id VARCHAR(50) NOT NULL,
+  loan_type TEXT NOT NULL,
   requested_amount DECIMAL(15, 2) NOT NULL,
   ai_score INT,
   risk_label VARCHAR(50),
@@ -50,8 +51,8 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO users (user_id, username, password_hash, role) 
-VALUES ('usr_admin_001', 'admin', '$2a$10$LfWS4Z9GoVXYIfbigm8bKOlikiFKsOj8FuczU.5.K2h/isbLUo016', 'ADMIN')
+INSERT INTO users (user_id, username, password_hash, role)
+VALUES ('usr_admin_001', 'admin', 'admin', 'ADMIN')
 ON CONFLICT (username) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_transactions_merchant_id ON transaction_logs(merchant_id);

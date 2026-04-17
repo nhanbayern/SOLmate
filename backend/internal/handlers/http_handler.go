@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/internal/handlers/requests"
 	"backend/internal/infrastructure"
+	"backend/internal/models"
 	"context"
 	"log/slog"
 	"net/http"
@@ -11,7 +12,7 @@ import (
 )
 
 type LoanService interface {
-	EvaluateLoan(ctx context.Context, loanID int, merchantID, customerID string) error
+	EvaluateLoan(ctx context.Context, loanID string, merchantID, customerID string) (*models.EvaluationResult, error)
 }
 
 type HTTPHandler struct {
@@ -63,7 +64,7 @@ func (h *HTTPHandler) EvaluateLoan(c *gin.Context) {
 		"customer_id", req.CustomerID,
 	)
 
-	err := h.loanService.EvaluateLoan(c.Request.Context(), req.LoanID, req.MerchantID, req.CustomerID)
+	result, err := h.loanService.EvaluateLoan(c.Request.Context(), req.LoanID, req.MerchantID, req.CustomerID)
 	if err != nil {
 		h.log.Error(
 			"Evaluate loan failed",
@@ -91,5 +92,6 @@ func (h *HTTPHandler) EvaluateLoan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Loan evaluated successfully",
+		"data":    result,
 	})
 }

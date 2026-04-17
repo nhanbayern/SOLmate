@@ -93,6 +93,94 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/customer/loans": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all loan evaluation requests for the logged-in customer",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customer"
+                ],
+                "summary": "List Customer Loan Requests",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submit a new loan request for the logged-in customer",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customer"
+                ],
+                "summary": "Create Loan Request",
+                "parameters": [
+                    {
+                        "description": "Loan request payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/requests.CreateLoanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/loans": {
             "get": {
                 "security": [
@@ -111,6 +199,20 @@ const docTemplate = `{
                     "loans"
                 ],
                 "summary": "List Loan Requests",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Limit (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -233,7 +335,8 @@ const docTemplate = `{
                 "summary": "Get Loan Request Detail",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
+                        "example": "\"LOAN20260417user1\"",
                         "description": "Loan Request ID",
                         "name": "id",
                         "in": "path",
@@ -278,7 +381,7 @@ const docTemplate = `{
                 "summary": "Apply Loan Decision",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Loan Request ID",
                         "name": "id",
                         "in": "path",
@@ -469,6 +572,28 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "requests.CreateLoanRequest": {
+            "type": "object",
+            "required": [
+                "loan_type",
+                "merchant_id",
+                "requested_amount"
+            ],
+            "properties": {
+                "loan_type": {
+                    "type": "string",
+                    "example": "Khoản vay SME nhỏ"
+                },
+                "merchant_id": {
+                    "type": "string",
+                    "example": "MER_52153584"
+                },
+                "requested_amount": {
+                    "type": "number",
+                    "example": 50000
+                }
+            }
+        },
         "requests.EvaluateLoanRequest": {
             "type": "object",
             "required": [
@@ -478,13 +603,16 @@ const docTemplate = `{
             ],
             "properties": {
                 "customer_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "CUST_68057522"
                 },
                 "loan_id": {
-                    "type": "integer"
+                    "type": "string",
+                    "example": "LOAN20260417152817user19096"
                 },
                 "merchant_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "MER_52153584"
                 }
             }
         },
@@ -505,12 +633,18 @@ const docTemplate = `{
         },
         "requests.LoginRequest": {
             "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
             "properties": {
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "admin"
                 },
-                "user_id": {
-                    "type": "string"
+                "username": {
+                    "type": "string",
+                    "example": "admin"
                 }
             }
         }

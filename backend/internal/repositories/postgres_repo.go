@@ -157,27 +157,46 @@ func (r *PostgresRepo) GetAllMerchants(ctx context.Context) ([]*models.Merchant,
 	return merchants, nil
 }
 
-func (r *PostgresRepo) GetAllLoanRequests(ctx context.Context) ([]*models.LoanRequest, error) {
+func (r *PostgresRepo) GetAllLoanRequests(ctx context.Context, limit, offset int) ([]*models.LoanRequest, error) {
 	query := `
-	SELECT id, merchant_id, customer_id, requested_amount, ai_score, risk_label, pd_value, ai_agent_report, status, created_at, updated_at
+	SELECT id, merchant_id, customer_id, loan_type, requested_amount, ai_score, risk_label, pd_value, ai_agent_report, status, created_at, updated_at
 		FROM loan_requests
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := r.db.QueryContext(ctx, query)
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("query all loan requests: %w", err)
 	}
 	defer rows.Close()
 
-	var requests []*models.LoanRequest
+	requests := make([]*models.LoanRequest, 0)
 	for rows.Next() {
 		var req models.LoanRequest
+		var aiScore sql.NullInt32
+		var riskLabel, aiAgentReport sql.NullString
+		var pdValue sql.NullFloat64
+
 		if err := rows.Scan(
-			&req.ID, &req.MerchantID, &req.CustomerID, &req.RequestedAmount, &req.AIScore, &req.RiskLabel, &req.PDValue, &req.AIAgentReport, &req.Status, &req.CreatedAt, &req.UpdatedAt,
+			&req.ID, &req.MerchantID, &req.CustomerID, &req.LoanType, &req.RequestedAmount, &aiScore, &riskLabel, &pdValue, &aiAgentReport, &req.Status, &req.CreatedAt, &req.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan loan request: %w", err)
 		}
+
+		if aiScore.Valid {
+			req.AIScore = int(aiScore.Int32)
+		}
+		if riskLabel.Valid {
+			req.RiskLabel = riskLabel.String
+		}
+		if pdValue.Valid {
+			req.PDValue = pdValue.Float64
+		}
+		if aiAgentReport.Valid {
+			req.AIAgentReport = aiAgentReport.String
+		}
+
 		requests = append(requests, &req)
 	}
 
@@ -189,27 +208,119 @@ func (r *PostgresRepo) GetAllLoanRequests(ctx context.Context) ([]*models.LoanRe
 	return requests, nil
 }
 
-func (r *PostgresRepo) GetLoanRequestByID(ctx context.Context, id int) (*models.LoanRequest, error) {
+func (r *PostgresRepo) GetLoanRequestsByCustomer(ctx context.Context, customerID string) ([]*models.LoanRequest, error) {
 	query := `
-	SELECT id, merchant_id, customer_id, requested_amount, ai_score, risk_label, pd_value, ai_agent_report, status, created_at, updated_at
+	SELECT id, merchant_id, customer_id, loan_type, requested_amount, ai_score, risk_label, pd_value, ai_agent_report, status, created_at, updated_at
+		FROM loan_requests
+		WHERE customer_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("query customer loan requests: %w", err)
+	}
+	defer rows.Close()
+
+	requests := make([]*models.LoanRequest, 0)
+	for rows.Next() {
+		var req models.LoanRequest
+		var aiScore sql.NullInt32
+		var riskLabel, aiAgentReport sql.NullString
+		var pdValue sql.NullFloat64
+
+		if err := rows.Scan(
+			&req.ID, &req.MerchantID, &req.CustomerID, &req.LoanType, &req.RequestedAmount, &aiScore, &riskLabel, &pdValue, &aiAgentReport, &req.Status, &req.CreatedAt, &req.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan customer loan request: %w", err)
+		}
+
+		if aiScore.Valid {
+			req.AIScore = int(aiScore.Int32)
+		}
+		if riskLabel.Valid {
+			req.RiskLabel = riskLabel.String
+		}
+		if pdValue.Valid {
+			req.PDValue = pdValue.Float64
+		}
+		if aiAgentReport.Valid {
+			req.AIAgentReport = aiAgentReport.String
+		}
+
+		requests = append(requests, &req)
+	}
+
+	r.log.Debug(
+		"Fetch customer loan requests successfully",
+		"customer_id", customerID,
+		"count", len(requests),
+	)
+
+	return requests, nil
+}
+
+func (r *PostgresRepo) GetLoanRequestByID(ctx context.Context, id string) (*models.LoanRequest, error) {
+	query := `
+	SELECT id, merchant_id, customer_id, loan_type, requested_amount, ai_score, risk_label, pd_value, ai_agent_report, status, created_at, updated_at
 		FROM loan_requests
 		WHERE id = $1
 	`
 
 	var req models.LoanRequest
+	var aiScore sql.NullInt32
+	var riskLabel, aiAgentReport sql.NullString
+	var pdValue sql.NullFloat64
+
 	if err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&req.ID, &req.MerchantID, &req.CustomerID, &req.RequestedAmount, &req.AIScore, &req.RiskLabel, &req.PDValue, &req.AIAgentReport, &req.Status, &req.CreatedAt, &req.UpdatedAt,
+		&req.ID, &req.MerchantID, &req.CustomerID, &req.LoanType, &req.RequestedAmount, &aiScore, &riskLabel, &pdValue, &aiAgentReport, &req.Status, &req.CreatedAt, &req.UpdatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-
 		return nil, fmt.Errorf("get loan request by id: %w", err)
+	}
+
+	if aiScore.Valid {
+		req.AIScore = int(aiScore.Int32)
+	}
+	if riskLabel.Valid {
+		req.RiskLabel = riskLabel.String
+	}
+	if pdValue.Valid {
+		req.PDValue = pdValue.Float64
+	}
+	if aiAgentReport.Valid {
+		req.AIAgentReport = aiAgentReport.String
 	}
 
 	r.log.Debug(
 		"Fetch loan request by ID successfully",
 		"loan_id", id,
+	)
+
+	return &req, nil
+}
+
+func (r *PostgresRepo) InsertLoanRequest(ctx context.Context, merchantID, customerID string, loanType string, requestedAmount float64) (*models.LoanRequest, error) {
+	loanID := fmt.Sprintf("LOAN%s%s", time.Now().Format("20060102150405"), customerID)
+
+	query := `
+	INSERT INTO loan_requests (id, merchant_id, customer_id, loan_type, requested_amount, status)
+		VALUES ($1, $2, $3, $4, $5, 'PENDING')
+		RETURNING id, merchant_id, customer_id, loan_type, requested_amount, status, created_at, updated_at
+	`
+
+	var req models.LoanRequest
+	if err := r.db.QueryRowContext(ctx, query, loanID, merchantID, customerID, loanType, requestedAmount).Scan(
+		&req.ID, &req.MerchantID, &req.CustomerID, &req.LoanType, &req.RequestedAmount, &req.Status, &req.CreatedAt, &req.UpdatedAt,
+	); err != nil {
+		return nil, fmt.Errorf("insert loan request: %w", err)
+	}
+
+	r.log.Debug(
+		"Loan request created successfully",
+		"loan_id", req.ID,
 	)
 
 	return &req, nil
@@ -267,13 +378,13 @@ func (r *PostgresRepo) GetDashboardStats(ctx context.Context) (*models.Dashboard
 
 func (r *PostgresRepo) UpdateLoanAIReport(
 	ctx context.Context,
-	loanID, score int,
+	loanID string, score int,
 	riskLabel string,
 	pdValue float64,
 	report string,
 ) error {
 	query := `
-	UPDATE loan_requests 
+	UPDATE loan_requests
 		SET ai_score = $1, risk_label = $2, pd_value = $3, ai_agent_report = $4, status = 'EVALUATED', updated_at = CURRENT_TIMESTAMP
 		WHERE id = $5
 	`
@@ -311,9 +422,9 @@ func (r *PostgresRepo) UpdateLoanAIReport(
 	return nil
 }
 
-func (r *PostgresRepo) UpdateLoanStatus(ctx context.Context, id int, status string) error {
+func (r *PostgresRepo) UpdateLoanStatus(ctx context.Context, id string, status string) error {
 	query := `
-	UPDATE loan_requests 
+	UPDATE loan_requests
 		SET status = $1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2
 	`

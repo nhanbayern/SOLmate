@@ -8,6 +8,7 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	Role         string    `json:"role"`
 	MerchantID   *string   `json:"merchant_id"`
+	Merchant     *Merchant `json:"merchant,omitempty"`
 	CustomerID   *string   `json:"customer_id"`
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -15,9 +16,10 @@ type User struct {
 }
 
 type AuthUser struct {
-	UserID     string  `json:"user_id"`
-	CustomerID *string `json:"customer_id"`
-	MerchantID *string `json:"merchant_id"`
-	Role       string  `json:"role"`
-	Status     string  `json:"status"`
+	UserID     string    `json:"user_id"`
+	CustomerID *string   `json:"customer_id"`
+	MerchantID *string   `json:"merchant_id"`
+	Merchant   *Merchant `json:"merchant,omitempty"`
+	Role       string    `json:"role"`
+	Status     string    `json:"status"`
 }

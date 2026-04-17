@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -76,7 +75,7 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*Lo
 		return nil, ErrInvalidCredentials
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	if user.PasswordHash != password {
 		s.log.Warn(
 			"Login failed: invalid password",
 			"username", username,
@@ -116,6 +115,7 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*Lo
 			UserID:     user.ID,
 			CustomerID: user.CustomerID,
 			MerchantID: user.MerchantID,
+			Merchant:   user.Merchant,
 			Role:       user.Role,
 			Status:     user.Status,
 		},
@@ -145,6 +145,7 @@ func (s *AuthService) GetMe(ctx context.Context, userID string) (*models.AuthUse
 		UserID:     user.ID,
 		CustomerID: user.CustomerID,
 		MerchantID: user.MerchantID,
+		Merchant:   user.Merchant,
 		Role:       user.Role,
 		Status:     user.Status,
 	}, nil

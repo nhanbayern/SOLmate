@@ -50,10 +50,10 @@ type Config struct {
 	LoanOutputClass       int
 	LoanPDIndex           int
 	LoanMaxScore          int
-	LoanVeryHighThreshold float64
-	LoanHighThreshold     float64
+	LoanVeryGoodThreshold float64
+	LoanGoodThreshold     float64
 	LoanMediumThreshold   float64
-	LoanLowThreshold      float64
+	LoanPoorThreshold     float64
 
 	AgentTimeout time.Duration
 
@@ -126,10 +126,10 @@ func LoadConfig() *Config {
 		LoanOutputClass:       LoanOutputClass,
 		LoanPDIndex:           LoanPDIndex,
 		LoanMaxScore:          LoanMaxScore,
-		LoanVeryHighThreshold: LoanVeryHighThreshold,
-		LoanHighThreshold:     LoanHighThreshold,
+		LoanVeryGoodThreshold: LoanVeryGoodThreshold,
+		LoanGoodThreshold:     LoanGoodThreshold,
 		LoanMediumThreshold:   LoanMediumThreshold,
-		LoanLowThreshold:      LoanLowThreshold,
+		LoanPoorThreshold:     LoanPoorThreshold,
 
 		AgentTimeout: AgentTimeout,
 
@@ -204,10 +204,10 @@ func (c *Config) ToLoanServiceConfig() LoanServiceConfig {
 		OutputClass:       c.LoanOutputClass,
 		PDIndex:           c.LoanPDIndex,
 		MaxScore:          c.LoanMaxScore,
-		VeryHighThreshold: c.LoanVeryHighThreshold,
-		HighThreshold:     c.LoanHighThreshold,
+		VeryGoodThreshold: c.LoanVeryGoodThreshold,
+		GoodThreshold:     c.LoanGoodThreshold,
 		MediumThreshold:   c.LoanMediumThreshold,
-		LowThreshold:      c.LoanLowThreshold,
+		PoorThreshold:     c.LoanPoorThreshold,
 		DBTimeout:         c.DBTimeout,
 		RedisTimeout:      c.RedisTimeout,
 	}

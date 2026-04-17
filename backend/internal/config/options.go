@@ -46,10 +46,10 @@ type LoanServiceConfig struct {
 	OutputClass       int
 	PDIndex           int
 	MaxScore          int
-	VeryHighThreshold float64
-	HighThreshold     float64
+	VeryGoodThreshold float64
+	GoodThreshold     float64
 	MediumThreshold   float64
-	LowThreshold      float64
+	PoorThreshold     float64
 	DBTimeout         time.Duration
 	RedisTimeout      time.Duration
 }

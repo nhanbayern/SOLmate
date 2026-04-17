@@ -25,22 +25,22 @@ func NewUserRepo(db *sql.DB) *UserRepo {
 
 func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	query := `
-	SELECT user_id, username, password_hash, role, merchant_id, customer_id, status, created_at, updated_at
-		FROM users
-		WHERE username = $1
+	SELECT
+		u.user_id, u.username, u.password_hash, u.role, u.merchant_id, u.customer_id, u.status, u.created_at, u.updated_at,
+		m.id, m.name, m.business_type, m.industry, m.years_in_business, m.owner_name, m.kyc_status, m.created_at, m.updated_at
+	FROM users u
+	LEFT JOIN merchants m ON u.merchant_id = m.id
+	WHERE u.username = $1
 	`
 
 	var user models.User
+	var mID, mName, mBusinessType, mIndustry, mOwnerName, mKycStatus sql.NullString
+	var mYearsInBusiness sql.NullInt32
+	var mCreatedAt, mUpdatedAt sql.NullTime
+
 	if err := r.db.QueryRowContext(ctx, query, username).Scan(
-		&user.ID,
-		&user.Username,
-		&user.PasswordHash,
-		&user.Role,
-		&user.MerchantID,
-		&user.CustomerID,
-		&user.Status,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.MerchantID, &user.CustomerID, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+		&mID, &mName, &mBusinessType, &mIndustry, &mYearsInBusiness, &mOwnerName, &mKycStatus, &mCreatedAt, &mUpdatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			r.log.Debug(
@@ -66,27 +66,41 @@ func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*models.
 		"username", user.Username,
 	)
 
+	if mID.Valid {
+		user.Merchant = &models.Merchant{
+			ID:              mID.String,
+			Name:            mName.String,
+			BusinessType:    mBusinessType.String,
+			Industry:        mIndustry.String,
+			YearsInBusiness: int(mYearsInBusiness.Int32),
+			OwnerName:       mOwnerName.String,
+			KYCStatus:       mKycStatus.String,
+			CreatedAt:       mCreatedAt.Time,
+			UpdatedAt:       mUpdatedAt.Time,
+		}
+	}
+
 	return &user, nil
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id string) (*models.User, error) {
 	query := `
-	SELECT user_id, username, password_hash, role, merchant_id, customer_id, status, created_at, updated_at
-		FROM users
-		WHERE user_id = $1
+	SELECT
+		u.user_id, u.username, u.password_hash, u.role, u.merchant_id, u.customer_id, u.status, u.created_at, u.updated_at,
+		m.id, m.name, m.business_type, m.industry, m.years_in_business, m.owner_name, m.kyc_status, m.created_at, m.updated_at
+	FROM users u
+	LEFT JOIN merchants m ON u.merchant_id = m.id
+	WHERE u.user_id = $1
 	`
 
 	var user models.User
+	var mID, mName, mBusinessType, mIndustry, mOwnerName, mKycStatus sql.NullString
+	var mYearsInBusiness sql.NullInt32
+	var mCreatedAt, mUpdatedAt sql.NullTime
+
 	if err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&user.ID,
-		&user.Username,
-		&user.PasswordHash,
-		&user.Role,
-		&user.MerchantID,
-		&user.CustomerID,
-		&user.Status,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.MerchantID, &user.CustomerID, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+		&mID, &mName, &mBusinessType, &mIndustry, &mYearsInBusiness, &mOwnerName, &mKycStatus, &mCreatedAt, &mUpdatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			r.log.Debug(
@@ -111,6 +125,20 @@ func (r *UserRepo) GetByID(ctx context.Context, id string) (*models.User, error)
 		"user_id", user.ID,
 		"username", user.Username,
 	)
+
+	if mID.Valid {
+		user.Merchant = &models.Merchant{
+			ID:              mID.String,
+			Name:            mName.String,
+			BusinessType:    mBusinessType.String,
+			Industry:        mIndustry.String,
+			YearsInBusiness: int(mYearsInBusiness.Int32),
+			OwnerName:       mOwnerName.String,
+			KYCStatus:       mKycStatus.String,
+			CreatedAt:       mCreatedAt.Time,
+			UpdatedAt:       mUpdatedAt.Time,
+		}
+	}
 
 	return &user, nil
 }

@@ -14,9 +14,9 @@ import (
 )
 
 type LoanDashboardService interface {
-	ListLoanRequests(ctx context.Context) ([]*models.LoanRequest, error)
-	GetLoanRequest(ctx context.Context, id int) (*models.LoanRequest, error)
-	MakeLoanDecision(ctx context.Context, id int, status string) error
+	ListLoanRequests(ctx context.Context, limit, offset int) ([]*models.LoanRequest, error)
+	GetLoanRequest(ctx context.Context, id string) (*models.LoanRequest, error)
+	MakeLoanDecision(ctx context.Context, id string, status string) error
 }
 
 type LoanHandler struct {
@@ -40,12 +40,27 @@ func NewLoanHandler(service LoanDashboardService) *LoanHandler {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
+// @Param        limit  query      int  false  "Limit (default 10)"
+// @Param        offset query      int  false  "Offset (default 0)"
 // @Success      200      {object}  map[string]interface{}
 // @Router       /api/loans [get]
 func (h *LoanHandler) List(c *gin.Context) {
-	h.log.Debug("List loan requests received")
+	limitStr := c.DefaultQuery("limit", "10")
+	offsetStr := c.DefaultQuery("offset", "0")
 
-	requests, err := h.service.ListLoanRequests(c.Request.Context())
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 10
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	h.log.Debug("List loan requests received", "limit", limit, "offset", offset)
+
+	requests, err := h.service.ListLoanRequests(c.Request.Context(), limit, offset)
 	if err != nil {
 		h.log.Error(
 			"List loan requests failed",
@@ -74,14 +89,13 @@ func (h *LoanHandler) List(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id   path      int  true  "Loan Request ID"
+// @Param        id   path      string  true  "Loan Request ID" example("LOAN20260417user1")
 // @Success      200      {object}  map[string]interface{}
 // @Failure      404      {object}  map[string]interface{}
 // @Router       /api/loans/{id} [get]
 func (h *LoanHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
+	id := c.Param("id")
+	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status": "failed",
 			"error":  "Invalid loan ID",
@@ -132,15 +146,14 @@ func (h *LoanHandler) Get(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id       path      int  true  "Loan Request ID"
+// @Param        id       path      string  true  "Loan Request ID"
 // @Param        request  body      requests.LoanDecisionRequest  true  "Decision payload"
 // @Success      200      {object}  map[string]interface{}
 // @Failure      400      {object}  map[string]interface{}
 // @Router       /api/loans/{id}/decision [post]
 func (h *LoanHandler) Decision(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
+	id := c.Param("id")
+	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status": "failed",
 			"error":  "Invalid loan ID",

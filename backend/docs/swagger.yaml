@@ -1,12 +1,31 @@
 basePath: /
 definitions:
+  requests.CreateLoanRequest:
+    properties:
+      loan_type:
+        example: Khoản vay SME nhỏ
+        type: string
+      merchant_id:
+        example: MER_52153584
+        type: string
+      requested_amount:
+        example: 50000
+        type: number
+    required:
+    - loan_type
+    - merchant_id
+    - requested_amount
+    type: object
   requests.EvaluateLoanRequest:
     properties:
       customer_id:
+        example: CUST_68057522
         type: string
       loan_id:
-        type: integer
+        example: LOAN20260417152817user19096
+        type: string
       merchant_id:
+        example: MER_52153584
         type: string
     required:
     - customer_id
@@ -26,9 +45,14 @@ definitions:
   requests.LoginRequest:
     properties:
       password:
+        example: admin
         type: string
-      user_id:
+      username:
+        example: admin
         type: string
+    required:
+    - password
+    - username
     type: object
 host: localhost:8080
 info:
@@ -88,11 +112,77 @@ paths:
       summary: Get Current User
       tags:
       - auth
+  /api/customer/loans:
+    get:
+      consumes:
+      - application/json
+      description: Get all loan evaluation requests for the logged-in customer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List Customer Loan Requests
+      tags:
+      - customer
+    post:
+      consumes:
+      - application/json
+      description: Submit a new loan request for the logged-in customer
+      parameters:
+      - description: Loan request payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/requests.CreateLoanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create Loan Request
+      tags:
+      - customer
   /api/loans:
     get:
       consumes:
       - application/json
       description: Get all loan evaluation requests and their results
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:
@@ -113,10 +203,11 @@ paths:
       description: Get detailed evaluation results of a specific loan request
       parameters:
       - description: Loan Request ID
+        example: '"LOAN20260417user1"'
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -145,7 +236,7 @@ paths:
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: Decision payload
         in: body
         name: request

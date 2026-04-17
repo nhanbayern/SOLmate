@@ -41,10 +41,10 @@ const (
 	LoanOutputClass       = 1
 	LoanPDIndex           = 0
 	LoanMaxScore          = 1000
-	LoanVeryHighThreshold = 0.1
-	LoanHighThreshold     = 0.3
+	LoanVeryGoodThreshold = 0.1
+	LoanGoodThreshold     = 0.3
 	LoanMediumThreshold   = 0.5
-	LoanLowThreshold      = 0.7
+	LoanPoorThreshold     = 0.7
 )
 
 const (

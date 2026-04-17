@@ -1,6 +1,20 @@
 package models
 
-type AgentMetrics map[string]any
+type AgentMetrics struct {
+	RevenueMean30d float64 `json:"Revenue_mean_30d"`
+	RevenueMean90d float64 `json:"Revenue_mean_90d"`
+	TxnFrequency   float64 `json:"Txn_frequency"`
+	Regime         string  `json:"regime"`
+	GrowthValue    float64 `json:"Growth_value"`
+	GrowthScore    float64 `json:"Growth_score"`
+	CVValue        float64 `json:"CV_value"`
+	CVScore        float64 `json:"CV_score"`
+	SpikeRatio     float64 `json:"Spike_ratio"`
+	SpikeScore     float64 `json:"Spike_score"`
+	TxnFreqScore   float64 `json:"Txn_freq_score"`
+	YearsScore     float64 `json:"Years_score"`
+	IndustryScore  float64 `json:"Industry_score"`
+}
 
 type EnterpriseProfile struct {
 	CustomerID      string  `json:"customer_id"`
@@ -14,17 +28,13 @@ type EnterpriseProfile struct {
 	CreatedAt       string  `json:"created_at"`
 }
 
-type EnterpriseCICMetrics struct {
-	CustomerID      string       `json:"customer_id"`
-	CreditScore     float64      `json:"credit_score"`
-	Metrics         AgentMetrics `json:"metrics"`
-	RiskClass       string       `json:"risk_class"`
-	RiskProbability float64      `json:"risk_probability"`
-}
-
 type AgentRiskRequest struct {
-	EnterpriseProfile    EnterpriseProfile    `json:"enterprise_profile"`
-	EnterpriseCICMetrics EnterpriseCICMetrics `json:"enterprise_cic_metrics"`
+	CustomerID        string            `json:"customer_id"`
+	CreditScore       float64           `json:"credit_score"`
+	Metrics           AgentMetrics      `json:"metrics"`
+	RiskClass         string            `json:"risk_class"`
+	RiskProbability   float64           `json:"risk_probability"`
+	EnterpriseProfile EnterpriseProfile `json:"enterprise_profile"`
 }
 
 type AgentRiskResponse struct {

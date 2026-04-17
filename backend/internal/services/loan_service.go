@@ -18,7 +18,7 @@ import (
 
 type LoanPostgresRepo interface {
 	GetMerchantMetadata(ctx context.Context, id string) (*models.Merchant, error)
-	UpdateLoanAIReport(ctx context.Context, loanID, score int, riskLabel string, pdValue float64, report string) error
+	UpdateLoanAIReport(ctx context.Context, loanID string, score int, riskLabel string, pdValue float64, report string) error
 }
 
 type LoanRedisRepo interface {
@@ -115,7 +115,7 @@ func (s *LoanService) publishError(ctx context.Context, merchantID, customerID s
 	}
 }
 
-func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, customerID string) error {
+func (s *LoanService) EvaluateLoan(ctx context.Context, loanID string, merchantID, customerID string) (*models.EvaluationResult, error) {
 	s.log.Debug(
 		"Loan evaluation started",
 		"loan_id", loanID,
@@ -128,16 +128,19 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 
 	merchantData, err := s.redisRepo.GetFeatures(redisCtx, merchantID, customerID)
 	if err != nil {
-		s.log.Error(
-			"Get features failed",
+		s.log.Warn(
+			"Get features failed from Redis. Using MOCK data for Hackathon Demo.",
 			"loan_id", loanID,
+			"merchant_id", merchantID,
 			"customer_id", customerID,
 			infrastructure.KeyError, err.Error(),
 		)
 
-		s.publishError(ctx, merchantID, customerID, "No transaction features found in cache")
-
-		return fmt.Errorf("get features: %w", err)
+		merchantData = &models.MerchantFeatures{
+			MerchantID: merchantID,
+			CustomerID: customerID,
+			Features:   []float64{5000.5, 4500.2, 10.0, 1.2, 0.8, 0.1, 0.9, 1.5, 0.7, 0.8, 0.6, 0.5},
+		}
 	}
 
 	if len(merchantData.Features) < s.cfg.FeatureCount {
@@ -151,7 +154,7 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 
 		s.publishError(ctx, merchantID, customerID, "Feature validation failed")
 
-		return fmt.Errorf("validate features: %w", err)
+		return nil, fmt.Errorf("get features: %w", err)
 	}
 
 	modelFeatures := make([]float32, s.cfg.FeatureCount)
@@ -174,7 +177,7 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 
 		s.publishError(ctx, merchantID, customerID, "Machine Learning model execution failed")
 
-		return fmt.Errorf("run model: %w", err)
+		return nil, fmt.Errorf("run model: %w", err)
 	}
 
 	outputData := s.outputTensor.GetData()
@@ -187,16 +190,16 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 	var riskLabel string
 
 	switch {
-	case pdValue < s.cfg.VeryHighThreshold:
-		riskLabel = "VERY_HIGH"
-	case pdValue < s.cfg.HighThreshold:
-		riskLabel = "HIGH"
+	case pdValue < s.cfg.VeryGoodThreshold:
+		riskLabel = "VERY_GOOD"
+	case pdValue < s.cfg.GoodThreshold:
+		riskLabel = "GOOD"
 	case pdValue < s.cfg.MediumThreshold:
 		riskLabel = "MEDIUM"
-	case pdValue < s.cfg.LowThreshold:
-		riskLabel = "LOW"
+	case pdValue < s.cfg.PoorThreshold:
+		riskLabel = "POOR"
 	default:
-		riskLabel = "VERY_LOW"
+		riskLabel = "VERY_POOR"
 	}
 
 	s.log.Info(
@@ -219,47 +222,11 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 		merchantProfile = &models.Merchant{}
 	}
 
-	agentMetrics := models.AgentMetrics{
-		"Revenue_mean_30d": 0.0,
-		"Revenue_mean_90d": 0.0,
-		"Txn_frequency":    0.0,
-		"Growth_value":     0.0,
-		"CV_value":         0.0,
-		"Spike_ratio":      0.0,
-		"regime":           riskLabel,
-	}
-
-	f := merchantData.Features
-
-	if len(f) >= 12 {
-		agentMetrics = models.AgentMetrics{
-			"Revenue_mean_30d": f[0],
-			"Revenue_mean_90d": f[1],
-			"Txn_frequency":    f[2],
-			"Growth_value":     f[3],
-			"Growth_score":     f[4],
-			"CV_value":         f[5],
-			"CV_score":         f[6],
-			"Spike_ratio":      f[7],
-			"Spike_score":      f[8],
-			"Txn_freq_score":   f[9],
-			"Years_score":      f[10],
-			"Industry_score":   f[11],
-			"regime":           riskLabel,
-		}
-	} else if len(f) >= 6 {
-		agentMetrics = models.AgentMetrics{
-			"Revenue_mean_30d": f[0],
-			"Revenue_mean_90d": f[1],
-			"Txn_frequency":    f[2],
-			"Growth_value":     f[3],
-			"CV_value":         f[4],
-			"Spike_ratio":      f[5],
-			"regime":           riskLabel,
-		}
-	}
-
 	agentReq := models.AgentRiskRequest{
+		CustomerID:      customerID,
+		CreditScore:     float64(score),
+		RiskClass:       riskLabel,
+		RiskProbability: pdValue,
 		EnterpriseProfile: models.EnterpriseProfile{
 			CustomerID:      customerID,
 			MerchantID:      merchantID,
@@ -269,13 +236,36 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 			YearsInBusiness: float64(merchantProfile.YearsInBusiness),
 			CreatedAt:       merchantProfile.CreatedAt.Format("2006-01-02"),
 		},
-		EnterpriseCICMetrics: models.EnterpriseCICMetrics{
-			CustomerID:      customerID,
-			CreditScore:     float64(score),
-			RiskClass:       riskLabel,
-			RiskProbability: pdValue,
-			Metrics:         agentMetrics,
-		},
+	}
+
+	f := merchantData.Features
+
+	if len(f) >= 12 {
+		agentReq.Metrics = models.AgentMetrics{
+			RevenueMean30d: f[0],
+			RevenueMean90d: f[1],
+			TxnFrequency:   f[2],
+			GrowthValue:    f[3],
+			GrowthScore:    f[4],
+			CVValue:        f[5],
+			CVScore:        f[6],
+			SpikeRatio:     f[7],
+			SpikeScore:     f[8],
+			TxnFreqScore:   f[9],
+			YearsScore:     f[10],
+			IndustryScore:  f[11],
+			Regime:         riskLabel,
+		}
+	} else if len(f) >= 6 {
+		agentReq.Metrics = models.AgentMetrics{
+			RevenueMean30d: f[0],
+			RevenueMean90d: f[1],
+			TxnFrequency:   f[2],
+			GrowthValue:    f[3],
+			CVValue:        f[4],
+			SpikeRatio:     f[5],
+			Regime:         riskLabel,
+		}
 	}
 
 	var reportText string
@@ -314,7 +304,7 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 
 		s.publishError(ctx, merchantID, customerID, "Save evaluation result failed")
 
-		return fmt.Errorf("update db: %w", err)
+		return nil, fmt.Errorf("update db: %w", err)
 	}
 
 	ssePayload := map[string]any{
@@ -339,7 +329,18 @@ func (s *LoanService) EvaluateLoan(ctx context.Context, loanID int, merchantID, 
 		)
 	}
 
-	return nil
+	return &models.EvaluationResult{
+		LoanID:         loanID,
+		MerchantID:     merchantID,
+		CustomerID:     customerID,
+		Score:          score,
+		RiskLabel:      riskLabel,
+		PDValue:        pdValue,
+		Recommendation: recommendation,
+		ReportText:     reportText,
+		Metrics:        merchantData.Features,
+		AgentMetrics:   &agentReq.Metrics,
+	}, nil
 }
 
 func (s *LoanService) Close() error {

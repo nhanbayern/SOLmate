@@ -72,6 +72,7 @@ func run() error {
 	loanDashboardHandler := handlers.NewLoanHandler(dashboardService)
 	transactionHandler := handlers.NewTransactionHandler(dashboardService)
 	statsHandler := handlers.NewStatsHandler(dashboardService)
+	customerHandler := handlers.NewCustomerHandler(dashboardService)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -118,6 +119,12 @@ func run() error {
 		api.GET("/stats", statsHandler.Get)
 
 		api.GET("/loans/stream", sseHandler.SubscribeToMerchantStatus)
+
+		customer := api.Group("/customer")
+		{
+			customer.GET("/loans", customerHandler.ListLoans)
+			customer.POST("/loans", customerHandler.RequestLoan)
+		}
 	}
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

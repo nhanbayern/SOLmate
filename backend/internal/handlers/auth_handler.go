@@ -61,10 +61,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	h.log.Debug(
 		"Login request received",
-		"user_id", req.UserID,
+		"username", req.Username,
 	)
 
-	result, err := h.authService.Login(c.Request.Context(), req.UserID, req.Password)
+	result, err := h.authService.Login(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		if err == services.ErrInvalidCredentials {
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -77,7 +77,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 		h.log.Error(
 			"Login failed",
-			"user_id", req.UserID,
+			"username", req.Username,
 			infrastructure.KeyError, err.Error(),
 		)
 
@@ -95,8 +95,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	)
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Logged in successfully",
+		"status":       "success",
+		"message":      "Logged in successfully",
+		"access_token": result.AccessToken,
+		"data":         result.User,
 	})
 }
 
@@ -123,7 +125,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 
-	_, err := h.authService.GetMe(c.Request.Context(), userID.(string))
+	user, err := h.authService.GetMe(c.Request.Context(), userID.(string))
 	if err != nil {
 		h.log.Error(
 			"GetMe failed",
@@ -142,6 +144,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "User profile fetched successfully",
+		"data":    user,
 	})
 }
 
@@ -159,19 +162,14 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"status": "failed",
-				"error":  "Invalid authorization format",
-			})
-
-			c.Abort()
-
-			return
+		var tokenString string
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+		} else {
+			tokenString = authHeader
 		}
 
-		userID, err := h.authService.ValidateToken(tokenParts[1])
+		userID, err := h.authService.ValidateToken(tokenString)
 		if err != nil {
 			h.log.Warn(
 				"Token validation failed",
