@@ -1,4 +1,4 @@
-# SOLmate Frontend
+# Vietnamese Loan Advisory Agent
 
 The SOLmate frontend provides a seamless and intuitive user interface designed for both banking professionals and customers, facilitating a transparent and efficient loan advisory process. 
 
@@ -11,26 +11,25 @@ The Banker interface is tailored for efficient loan processing and risk assessme
 - Leverage AI-driven insights to make informed and quick lending decisions.
 - Visualize and evaluate credit risk profiles with comprehensive dashboards.
 
-![Main Dashboard](image/Main.png)
+<img src="./image/Main.png" alt="Main Dashboard" width="100%">
 
-![Credit Risk Dashboard](image/CreditRiskDash.png)
+<img src="./image/CreditRiskDash.png" alt="Credit Risk Dashboard" width="100%">
 
-![Loan Request](image/Loanrequest.png)
+<img src="./image/Loanrequest.png" alt="Loan Request" width="100%">
 
-![Loan Analysis](image/Loan_analysis.png)
+<img src="./image/Loan_analysis.png" alt="Loan Analysis" width="100%">
 
 ### Customer Workspace
 The Customer interface empowers borrowers by giving them clear visibility into their financial standing and loan status. It enables customers to:
 - Track their active loan applications and current banking profiles.
 - Receive personalized AI suggestions on improving financial health and creditworthiness.
 
-![Customer Dashboard](image/customer_dash.png)
+<img src="./image/customer_dash.png" alt="Customer Dashboard" width="100%">
 
-![AI Suggestions](image/AI_suggestions.png)
-
+<img src="./image/AI_suggestions.png" alt="AI Suggestions" width="100%
 ---
 
-# Vietnamese Loan Advisory Agent
+## Core logical solutions
 
 This project implements an agent that supports loan assessment for Vietnamese businesses and household businesses. 
 
