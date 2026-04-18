@@ -35,6 +35,7 @@ Thumbs.db
 !/Banker_usecase/
 !/Design for SOLmate Solutions/
 !/User_Usecase/
+!/image/
 !/.gitignore
 # --- Environment & Secrets ---
 .env
