@@ -1,3 +1,22 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
 # --- System & IDEs ---
 .DS_Store
 Thumbs.db
@@ -8,10 +27,22 @@ Thumbs.db
 *.njsproj
 *.sln
 
+
+# Ignore all files and directories in the root
+/*
+
+# Allow specific directories and .gitignore itself
+!/Banker_usecase/
+!/Design for SOLmate Solutions/
+!/User_Usecase/
+!/.gitignore
 # --- Environment & Secrets ---
 .env
 .env.*
 !.env.example
+.venv
+.venv/
+venv/
 
 # --- Backend ---
 backend/bin/

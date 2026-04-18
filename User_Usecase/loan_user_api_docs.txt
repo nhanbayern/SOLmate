@@ -1,0 +1,356 @@
+TÀI LIỆU THIẾT KẾ API LOAN USER
+Phiên bản: v1.1
+Ngày: 2026-04-17
+Phạm vi: User Use Case (Loan)
+
+=================================================================
+1) TỔNG QUAN
+=================================================================
+Mục tiêu:
+- Hỗ trợ user đăng nhập
+- Xem hồ sơ cá nhân/doanh nghiệp
+- Gửi yêu cầu vay theo danh mục mục đích vay (ENUM)
+
+Base URL:
+- /api/v1
+
+Định dạng dữ liệu:
+- Request/Response: application/json
+- Encoding: UTF-8
+
+Xác thực:
+- JWT Bearer token
+- Header: Authorization: Bearer <access_token>
+
+=================================================================
+2) MÔ HÌNH DỮ LIỆU (USER PROFILE)
+=================================================================
+Các trường UserProfile:
+- customer_id: string
+- merchant_id: string
+- name: string
+- age: integer
+- industry: string
+- business_type: string
+- years_in_business: number
+- location: string
+- created_at: string (ISO 8601 datetime)
+
+Ví dụ:
+{
+  "customer_id": "CUST_25552451",
+  "merchant_id": "MER_100025",
+  "name": "Tạ Gia Phúc",
+  "age": 34,
+  "industry": "Transportation_Service",
+  "business_type": "Sole_Proprietor",
+  "years_in_business": 3.8,
+  "location": "Hưng Yên",
+  "created_at": "2026-03-20T10:15:00Z"
+}
+
+=================================================================
+3) ENUM MỤC ĐÍCH VAY (INPUT CHO YÊU CẦU VAY)
+=================================================================
+Lưu ý quan trọng:
+- Input field: purpose
+- Kiểu: ENUM string
+- Giá trị hợp lệ PHẢI theo trường "name" (tiếng Việt có dấu) bên dưới
+
+Allowed enum values cho purpose:
+1. "Vay vốn lưu động"
+2. "Ứng tiền theo doanh thu (MCA)"
+3. "Hạn mức tín dụng quay vòng"
+4. "Tài trợ theo doanh thu"
+5. "Tài trợ hóa đơn đơn giản"
+6. "Khoản vay SME nhỏ"
+7. "Vay thúc đẩy tăng trưởng"
+8. "Vay hỗ trợ mùa vụ"
+
+Khuyến nghị:
+- FE hiển thị danh sách loan purpose từ API danh mục (GET /loan-purposes)
+- FE gửi đúng string name như trên vào field purpose
+
+=================================================================
+4) API ENDPOINTS
+=================================================================
+
+4.1) Đăng nhập
+Method: POST
+Path: /auth/login
+Auth: Không
+
+Request body:
+{
+  "user_id": "user_001",
+  "password": "<SECRET>"
+}
+
+Validation:
+- user_id: bắt buộc, string, 3-100 ký tự
+- password: bắt buộc, string, tối thiểu 8 ký tự
+
+Success response (200):
+{
+  "access_token": "<JWT_ACCESS_TOKEN>",
+  "refresh_token": "<JWT_REFRESH_TOKEN>",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user": {
+    "user_id": "user_001",
+    "customer_id": "CUST_25552451",
+    "merchant_id": "MER_100025"
+  }
+}
+
+Error responses:
+- 400: payload không hợp lệ
+- 401: sai thông tin đăng nhập
+- 429: đăng nhập quá số lần cho phép
+
+-----------------------------------------------------------------
+4.2) Xem hồ sơ user
+Method: GET
+Path: /users/me/profile
+Auth: Có (Bearer token)
+
+Success response (200):
+{
+  "customer_id": "CUST_25552451",
+  "merchant_id": "MER_100025",
+  "name": "Tạ Gia Phúc",
+  "age": 34,
+  "industry": "Transportation_Service",
+  "business_type": "Sole_Proprietor",
+  "years_in_business": 3.8,
+  "location": "Hưng Yên",
+  "created_at": "2026-03-20T10:15:00Z"
+}
+
+Error responses:
+- 401: chưa xác thực
+- 404: không tìm thấy hồ sơ user
+
+-----------------------------------------------------------------
+4.3) Lấy danh mục mục đích vay
+Method: GET
+Path: /loan-purposes
+Auth: Có (Bearer token)
+
+Success response (200):
+{
+  "items": [
+    {
+      "code": "working_capital",
+      "name": "Vay vốn lưu động",
+      "description": "Khoản vay ngắn hạn phục vụ hoạt động kinh doanh hàng ngày, dựa trên dòng tiền vào",
+      "tenor": "3-12 tháng",
+      "repayment_source": "doanh thu POS hàng ngày/tuần"
+    },
+    {
+      "code": "merchant_cash_advance",
+      "name": "Ứng tiền theo doanh thu (MCA)",
+      "description": "Ứng trước tiền dựa trên doanh thu POS tương lai, trả bằng % trên mỗi giao dịch",
+      "tenor": "linh hoạt (đến khi trả đủ)",
+      "repayment_source": "% cố định trên doanh thu hàng ngày"
+    },
+    {
+      "code": "revolving_credit",
+      "name": "Hạn mức tín dụng quay vòng",
+      "description": "Cấp hạn mức dựa trên dòng tiền ổn định, cho phép rút và hoàn trả linh hoạt",
+      "tenor": "gia hạn theo chu kỳ 6-12 tháng",
+      "repayment_source": "dòng tiền kinh doanh liên tục"
+    },
+    {
+      "code": "revenue_based_financing",
+      "name": "Tài trợ theo doanh thu",
+      "description": "Khoản vay được hoàn trả theo tỷ lệ % trên doanh thu trong tương lai",
+      "tenor": "linh hoạt",
+      "repayment_source": "% trên doanh thu hàng tháng"
+    },
+    {
+      "code": "invoice_light_financing",
+      "name": "Tài trợ hóa đơn đơn giản",
+      "description": "Khoản vay dựa trên luồng giao dịch/hóa đơn mà không cần hệ thống công nợ chính thức",
+      "tenor": "1-6 tháng",
+      "repayment_source": "dòng tiền dự kiến từ bán hàng"
+    },
+    {
+      "code": "micro_sme_loan",
+      "name": "Khoản vay SME nhỏ",
+      "description": "Khoản vay quy mô nhỏ cho hộ kinh doanh dựa trên dữ liệu POS",
+      "tenor": "3-9 tháng",
+      "repayment_source": "doanh thu hàng ngày"
+    },
+    {
+      "code": "growth_boost_loan",
+      "name": "Vay thúc đẩy tăng trưởng",
+      "description": "Khoản vay dành cho doanh nghiệp có xu hướng doanh thu tăng mạnh",
+      "tenor": "6-18 tháng",
+      "repayment_source": "dòng tiền tăng trưởng"
+    },
+    {
+      "code": "seasonal_support_loan",
+      "name": "Vay hỗ trợ mùa vụ",
+      "description": "Khoản vay phục vụ doanh nghiệp có doanh thu theo mùa",
+      "tenor": "theo chu kỳ kinh doanh",
+      "repayment_source": "doanh thu mùa cao điểm"
+    }
+  ]
+}
+
+Error responses:
+- 401: chưa xác thực
+
+-----------------------------------------------------------------
+4.4) Tạo yêu cầu vay
+Method: POST
+Path: /loan-requests
+Auth: Có (Bearer token)
+
+Request body (MVP):
+{
+  "purpose": "Vay vốn lưu động"
+}
+
+Request body (khuyến nghị):
+{
+  "purpose": "Vay vốn lưu động",
+  "requested_amount": 200000000,
+  "currency": "VND",
+  "note": "Cần bổ sung vốn để nhập hàng"
+}
+
+Validation rules:
+- purpose: bắt buộc, ENUM, phải thuộc danh sách mục 3
+- requested_amount: tùy chọn, number > 0, tối đa 2000000000
+- currency: tùy chọn, mặc định "VND"
+- note: tùy chọn, tối đa 1000 ký tự
+
+Success response (201):
+{
+  "request_id": "LR_20260417_0001",
+  "customer_id": "CUST_25552451",
+  "merchant_id": "MER_100025",
+  "purpose": "Vay vốn lưu động",
+  "requested_amount": 200000000,
+  "currency": "VND",
+  "status": "SUBMITTED",
+  "created_at": "2026-04-17T09:00:00Z"
+}
+
+Error responses:
+- 400: payload không hợp lệ
+- 401: chưa xác thực
+- 422: purpose không nằm trong enum cho phép
+- 409: trùng yêu cầu vay đang hoạt động (nếu bật business rule)
+
+-----------------------------------------------------------------
+4.5) Xem danh sách yêu cầu vay của user
+Method: GET
+Path: /loan-requests
+Auth: Có (Bearer token)
+
+Query params:
+- status (tùy chọn): SUBMITTED | IN_REVIEW | APPROVED | REJECTED
+- page (tùy chọn): integer >= 1
+- page_size (tùy chọn): integer, 1..100
+
+Success response (200):
+{
+  "items": [
+    {
+      "request_id": "LR_20260417_0001",
+      "purpose": "Vay vốn lưu động",
+      "requested_amount": 200000000,
+      "currency": "VND",
+      "status": "IN_REVIEW",
+      "created_at": "2026-04-17T09:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "page_size": 20,
+    "total": 1
+  }
+}
+
+Error responses:
+- 401: chưa xác thực
+
+-----------------------------------------------------------------
+4.6) Xem chi tiết 1 yêu cầu vay
+Method: GET
+Path: /loan-requests/{request_id}
+Auth: Có (Bearer token)
+
+Success response (200):
+{
+  "request_id": "LR_20260417_0001",
+  "customer_id": "CUST_25552451",
+  "merchant_id": "MER_100025",
+  "purpose": "Vay vốn lưu động",
+  "requested_amount": 200000000,
+  "currency": "VND",
+  "status": "IN_REVIEW",
+  "decision_note": null,
+  "created_at": "2026-04-17T09:00:00Z",
+  "updated_at": "2026-04-17T12:45:00Z"
+}
+
+Error responses:
+- 401: chưa xác thực
+- 403: không có quyền truy cập (request không thuộc user)
+- 404: không tìm thấy request
+
+=================================================================
+5) CHUẨN LỖI DÙNG CHUNG
+=================================================================
+{
+  "error": {
+    "code": "INVALID_ENUM",
+    "message": "purpose must be one of allowed values",
+    "details": {
+      "field": "purpose"
+    }
+  },
+  "trace_id": "9f8e8f0d7b62444f"
+}
+
+Suggested error codes:
+- INVALID_PAYLOAD
+- UNAUTHORIZED
+- FORBIDDEN
+- NOT_FOUND
+- INVALID_ENUM
+- BUSINESS_RULE_VIOLATION
+- RATE_LIMITED
+- INTERNAL_ERROR
+
+=================================================================
+6) BẢO MẬT VÀ AUDIT
+=================================================================
+- Hash mật khẩu: Argon2id hoặc bcrypt (theo chính sách min cost)
+- JWT hết hạn ngắn (ví dụ 60 phút) + refresh token rotation
+- Rate limit cho /auth/login (ví dụ 5 request/phút/ip)
+- Audit log bắt buộc cho:
+  - Login success/fail
+  - Loan request creation
+  - Loan request status change
+
+=================================================================
+7) ÁNH XẠ USE CASE
+=================================================================
+Use case: Đăng nhập
+- POST /auth/login
+
+Use case: Xem hồ sơ
+- GET /users/me/profile
+- Fields: customer_id, merchant_id, name, age, industry, business_type, years_in_business, location, created_at
+
+Use case: Yêu cầu được vay
+- GET /loan-purposes (để FE lấy enum)
+- POST /loan-requests (input purpose theo trường name)
+- GET /loan-requests, GET /loan-requests/{request_id} (theo dõi trạng thái)
+
+KẾT THÚC TÀI LIỆU
