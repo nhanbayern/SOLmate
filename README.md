@@ -12,10 +12,16 @@ The Banker interface is tailored for efficient loan processing and risk assessme
 - Visualize and evaluate credit risk profiles with comprehensive dashboards.
 
 
-<img src="image/Main.png" width="70%">
-<img src="image/CreditRiskDash.png" width="70%">
-<img src="image/Loanrequest.png" width="70%">
-<img src="image/Loan_analysis.png" width="70%">
+<table style="width: 100%;">
+  <tr>
+    <td style="width: 50%;"><img src="image/Main.png" width="100%"></td>
+    <td style="width: 50%;"><img src="image/CreditRiskDash.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td style="width: 50%;"><img src="image/Loanrequest.png" width="100%"></td>
+    <td style="width: 50%;"><img src="image/Loan_analysis.png" width="100%"></td>
+  </tr>
+</table>
 
 
 ### Customer Workspace
@@ -24,8 +30,12 @@ The Customer interface empowers borrowers by giving them clear visibility into t
 - Receive personalized AI suggestions on improving financial health and creditworthiness.
 
 
-<img src="image/customer_dash.png" width="70%">
-<img src="image/AI_suggestions.png" width="70%">
+<table style="width: 100%;">
+  <tr>
+    <td style="width: 50%;"><img src="image/customer_dash.png" width="100%"></td>
+    <td style="width: 50%;"><img src="image/AI_suggestions.png" width="100%"></td>
+  </tr>
+</table>
 
 
 ---
