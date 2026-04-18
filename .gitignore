@@ -17,6 +17,11 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+# --- System & IDEs ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
@@ -31,3 +36,50 @@ dist-ssr
 !/Design for SOLmate Solutions/
 !/User_Usecase/
 !/.gitignore
+# --- Environment & Secrets ---
+.env
+.env.*
+!.env.example
+.venv
+.venv/
+venv/
+
+# --- Backend ---
+backend/bin/
+backend/vendor/
+backend/obj/
+backend/*.exe
+backend/*.test
+
+# --- Agent ---
+agent/__pycache__/
+agent/*.py[cod]
+agent/*$py.class
+agent/.venv/
+agent/venv/
+agent/env/
+agent/ENV/
+agent/.pytest_cache/
+agent/.ipynb_checkpoints/
+agent/*.log
+
+# --- Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# --- Infrastructure & Data ---
+docker-compose.override.yml
+tmp/
+temp/
+*.csv
+*.xlsx
+*.sqlite
+*.db
+
+# --- AI Models ---
+*.onnx
