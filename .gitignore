@@ -33,9 +33,17 @@ Thumbs.db
 
 # Allow specific directories and .gitignore itself
 !/Banker_usecase/
+!/Banker_usecase/**
+
 !/Design for SOLmate Solutions/
+!/Design for SOLmate Solutions/**
+
 !/User_Usecase/
+!/User_Usecase/**
+
 !/image/
+!/image/**
+
 !/.gitignore
 # --- Environment & Secrets ---
 .env
