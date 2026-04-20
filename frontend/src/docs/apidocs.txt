@@ -1,0 +1,566 @@
+SOLmate Banker Dashboard API
+Version: 1.1 (Frontend-aligned)
+Base URL: localhost:8080/
+Source route set: keep existing routes from current backend docs
+
+==================================================
+0) Muc tieu tai lieu
+==================================================
+Tai lieu nay viet lai contract API de backend co the dev dung theo nhu cau frontend hien tai,
+nhung KHONG doi route goc da co:
+- auth
+  - POST /api/auth/login
+  - GET /api/auth/me
+- loans
+  - GET /api/loans
+  - POST /api/loans/evaluate
+  - GET /api/loans/stream
+  - GET /api/loans/{id}
+  - POST /api/loans/{id}/decision
+- merchants
+  - GET /api/merchants
+  - GET /api/merchants/{id}
+- stats
+  - GET /api/stats
+- transactions
+  - GET /api/transactions
+
+==================================================
+1) Auth va Authorization
+==================================================
+1.1 Co che auth
+- POST /api/auth/login tra ve accessToken (JWT).
+- Tat ca endpoint con lai (tru /api/auth/login) yeu cau:
+  Authorization: Bearer <accessToken>
+
+1.2 Roles
+- BANKER
+- CUSTOMER
+
+1.3 Quy uoc user identity
+- User banker map vao nhan vien ngan hang.
+- User customer map vao 1 merchant/customer duy nhat.
+- API can tra cac truong id phuc vu frontend:
+  userId, role, customerId, merchantId.
+
+==================================================
+2) Unified response va error format
+==================================================
+2.1 Success format (khuyen nghi)
+{
+  "success": true,
+  "data": { ... },
+  "meta": { ... optional ... }
+}
+
+2.2 Error format (bat buoc thong nhat)
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "purpose is required",
+    "details": [
+      { "field": "purpose", "message": "must not be empty" }
+    ]
+  }
+}
+
+2.3 HTTP status su dung
+- 200 OK
+- 201 Created (neu backend muon phan biet tao moi)
+- 400 Bad Request
+- 401 Unauthorized
+- 403 Forbidden
+- 404 Not Found
+- 409 Conflict
+- 422 Unprocessable Entity
+- 500 Internal Server Error
+
+==================================================
+3) Data models (expanded for frontend)
+==================================================
+3.1 LoginRequest (requests.LoginRequest)
+{
+  "userId": "string",
+  "password": "string"
+}
+
+3.2 LoginResponse
+{
+  "accessToken": "string",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "user": {
+    "userId": "string",
+    "role": "BANKER|CUSTOMER",
+    "displayName": "string",
+    "customerId": "string|null",
+    "merchantId": "string|null"
+  }
+}
+
+3.3 CurrentUser (/api/auth/me)
+{
+  "userId": "string",
+  "role": "BANKER|CUSTOMER",
+  "displayName": "string",
+  "customerId": "string|null",
+  "merchantId": "string|null"
+}
+
+3.4 Merchant summary
+{
+  "customer_id": "CUST_xxx",
+  "merchant_id": "MER_xxx",
+  "name": "string",
+  "age": 30,
+  "industry": "Fresh_Market_Trading",
+  "business_type": "Sole_Proprietor",
+  "years_in_business": 2.8,
+  "location": "Can Tho",
+  "created_at": "2026-04-10T10:30:00Z",
+  "loan_type": "Vay von luu dong"
+}
+
+3.5 Merchant risk/metric detail
+{
+  "Revenue_mean_30d": 2431519,
+  "Revenue_mean_90d": 8000000,
+  "Txn_frequency": 25.4,
+  "regime": "NORMAL|HIGH_RISK",
+  "Growth_value": 0.12,
+  "Growth_score": 0.62,
+  "CV_value": 0.45,
+  "CV_score": 0.48,
+  "Spike_ratio": 1.2,
+  "Spike_score": 0.55,
+  "Txn_freq_score": 0.67,
+  "Years_score": 0.50,
+  "Industry_score": 0.70,
+  "CIC_SCORE": 565.05,
+  "label": "VERY_GOOD|GOOD|MEDIUM|POOR|VERY_POOR",
+  "label_quantile": "string",
+  "label_cic_range": "string",
+  "default_probability": 0.293
+}
+
+3.6 LoanRequest
+{
+  "request_id": "REQ_001",
+  "customer_id": "CUST_20331909",
+  "merchant_id": "MER_77698148",
+  "purpose": "working_capital",
+  "purpose_label": "Vay von luu dong",
+  "requested_amount": 50000000,
+  "currency": "VND",
+  "status": "SUBMITTED|IN_REVIEW|APPROVED|REJECTED",
+  "created_at": "2026-04-10T10:30:00Z",
+  "updated_at": "2026-04-10T10:30:00Z",
+  "decision_note": "string|null"
+}
+
+3.7 EvaluateLoanRequest (requests.EvaluateLoanRequest)
+Muc dich dung cho frontend Create Loan + pre-evaluation AI.
+{
+  "customer_id": "CUST_20331909",
+  "purpose": "working_capital",
+  "requested_amount": 50000000,
+  "currency": "VND",
+  "note": "string optional",
+  "submit": true
+}
+
+Quy uoc:
+- submit=true: tao loan request moi (status mac dinh SUBMITTED)
+- submit=false hoac bo qua: chi evaluate nhanh, khong tao request (optional)
+
+3.8 LoanDecisionRequest (requests.LoanDecisionRequest)
+{
+  "decision": "APPROVED|REJECTED|IN_REVIEW",
+  "decision_note": "string"
+}
+
+3.9 AI recommendation model
+{
+  "customer_id": "CUST_20331909",
+  "report_text_user": "markdown text",
+  "report_text_bank": "markdown text"
+}
+
+3.10 Transaction model
+{
+  "transaction_id": "string",
+  "customer_id": "CUST_xxx",
+  "merchant_id": "MER_xxx",
+  "status": "SUCCESS|FAILED|PENDING",
+  "amount": 1200000,
+  "date": "2026-04-10",
+  "time": "10:30:00",
+  "beneficiary_account": "string",
+  "beneficiary_name": "string",
+  "beneficiary_bank": "string",
+  "transfer_content": "string",
+  "reference_code": "string",
+  "transaction_code": "string",
+  "invoice_id": "string",
+  "invoice_total": 1200000
+}
+
+==================================================
+4) Endpoint contracts chi tiet
+==================================================
+
+----------------------------------
+4.1 POST /api/auth/login
+----------------------------------
+Mo ta:
+- Dang nhap banker/customer.
+- Frontend login banker va customer deu dung endpoint nay.
+
+Request body:
+- Theo LoginRequest.
+
+Response 200:
+- Theo LoginResponse.
+
+Validation:
+- userId required
+- password required
+
+----------------------------------
+4.2 GET /api/auth/me
+----------------------------------
+Mo ta:
+- Lay user dang dang nhap.
+- Frontend dung de khoi tao session thay cho localStorage mock.
+
+Response 200:
+- Theo CurrentUser.
+
+----------------------------------
+4.3 GET /api/stats
+----------------------------------
+Mo ta:
+- Du lieu tong quan cho Banker Dashboard.
+
+Query params (optional):
+- fromDate=YYYY-MM-DD
+- toDate=YYYY-MM-DD
+- industry=string
+- location=string
+
+Response 200:
+{
+  "kpis": {
+    "avgCicScore": 560.2,
+    "avgDefaultProbability": 0.243,
+    "highRiskCount": 120,
+    "highRiskPercent": 18.5,
+    "totalCustomers": 650
+  },
+  "riskDistribution": [
+    { "label": "GOOD", "count": 220 },
+    { "label": "MEDIUM", "count": 180 },
+    { "label": "POOR", "count": 90 }
+  ],
+  "industrySummary": [
+    { "industry": "Fresh_Market_Trading", "avgCIC": 552.1, "avgDefault": 0.27 }
+  ],
+  "growthVsCic": [
+    { "customer_id": "CUST_x", "name": "ABC", "growth": 0.61, "cic": 565.1, "revenue": 2400000, "label": "MEDIUM" }
+  ]
+}
+
+----------------------------------
+4.4 GET /api/merchants
+----------------------------------
+Mo ta:
+- List merchant/customer cho banker table + filter.
+- Customer role co the goi nhung backend nen tra ve chi chinh minh.
+
+Query params:
+- page (default 1)
+- pageSize (default 20, max 200)
+- search (customer_id, merchant_id, name)
+- label (VERY_GOOD|GOOD|MEDIUM|POOR|VERY_POOR)
+- industry
+- business_type
+- location
+- sortBy (created_at|CIC_SCORE|default_probability|Revenue_mean_30d)
+- sortOrder (asc|desc)
+
+Response 200:
+{
+  "items": [
+    {
+      "customer": { ...Merchant summary... },
+      "metrics": { ...Merchant risk/metric detail... }
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 650,
+    "totalPages": 33
+  }
+}
+
+----------------------------------
+4.5 GET /api/merchants/{id}
+----------------------------------
+Mo ta:
+- Lay chi tiet 1 merchant/customer de hien thi profile banker/customer.
+
+Path:
+- id = customer_id hoac merchant_id (backend nen support 1 trong 2)
+
+Response 200:
+{
+  "customer": { ...Merchant summary... },
+  "metrics": { ...Merchant risk/metric detail... },
+  "loan_recommendation": {
+    "recommended_purpose": "working_capital",
+    "recommended_amount": 50000000
+  }
+}
+
+----------------------------------
+4.6 GET /api/transactions
+----------------------------------
+Mo ta:
+- List transactions cho phan loan detail banker (revenue trend 150 ngay)
+  va cac report analytics.
+
+Query params:
+- customerId (uu tien cho loan detail)
+- merchantId
+- fromDate=YYYY-MM-DD
+- toDate=YYYY-MM-DD
+- groupBy=none|day|week|month (optional, neu can backend aggregate san)
+- page
+- pageSize
+
+Response 200:
+{
+  "items": [
+    { ...Transaction model... }
+  ],
+  "meta": {
+    "page": 1,
+    "pageSize": 100,
+    "total": 438
+  }
+}
+
+----------------------------------
+4.7 GET /api/loans
+----------------------------------
+Mo ta:
+- List loan request cho banker va customer.
+
+Query params:
+- requestId
+- customerId
+- merchantId
+- status=SUBMITTED|IN_REVIEW|APPROVED|REJECTED
+- fromDate=YYYY-MM-DD
+- toDate=YYYY-MM-DD
+- page
+- pageSize
+- sortBy=created_at|updated_at|requested_amount
+- sortOrder=asc|desc
+- scope=my (customer role: chi lay request cua chinh minh)
+
+Response 200:
+{
+  "items": [
+    {
+      "loan": { ...LoanRequest... },
+      "customer": {
+        "name": "string",
+        "label": "MEDIUM"
+      }
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 120
+  }
+}
+
+----------------------------------
+4.8 POST /api/loans/evaluate
+----------------------------------
+Mo ta:
+- Dung cho man Create Loan cua customer.
+- Van giu route cu, mo rong behavior theo truong submit.
+
+Request body:
+- Theo EvaluateLoanRequest.
+
+Response 200 (submit=true):
+{
+  "loan": { ...LoanRequest... },
+  "ai_recommendation": { ...AI recommendation model... },
+  "evaluation": {
+    "risk_label": "MEDIUM",
+    "default_probability": 0.293,
+    "suggested_limit": 50000000,
+    "notes": ["string", "string"]
+  }
+}
+
+Response 200 (submit=false):
+{
+  "evaluation": {
+    "risk_label": "MEDIUM",
+    "default_probability": 0.293,
+    "suggested_limit": 50000000,
+    "notes": ["string", "string"]
+  }
+}
+
+Validation:
+- customer_id required
+- purpose required
+- requested_amount >= 1000000
+- currency in ["VND"]
+
+----------------------------------
+4.9 GET /api/loans/{id}
+----------------------------------
+Mo ta:
+- Lay chi tiet loan request cho banker loan detail va customer loan detail.
+
+Path:
+- id = request_id
+
+Response 200:
+{
+  "loan": { ...LoanRequest... },
+  "customer": {
+    "profile": { ...Merchant summary... },
+    "metrics": { ...Merchant risk/metric detail... }
+  },
+  "ai_recommendation": { ...AI recommendation model... },
+  "transaction_summary": {
+    "window_days": 150,
+    "total_revenue": 250000000,
+    "total_transactions": 210,
+    "avg_transaction_value": 1190000
+  }
+}
+
+----------------------------------
+4.10 POST /api/loans/{id}/decision
+----------------------------------
+Mo ta:
+- Banker duyet/tu choi/chuyen IN_REVIEW.
+- Sau khi update, frontend can thay status moi ngay.
+
+Request body:
+- Theo LoanDecisionRequest.
+
+Response 200:
+{
+  "loan": { ...LoanRequest updated... },
+  "audit": {
+    "updatedBy": "BANKER_001",
+    "updatedAt": "2026-04-17T10:20:30Z"
+  }
+}
+
+Rule:
+- Chi role BANKER duoc goi.
+- decision_note bat buoc khi REJECTED.
+
+----------------------------------
+4.11 GET /api/loans/stream (SSE)
+----------------------------------
+Mo ta:
+- Stream real-time cap nhat loan status cho banker va customer.
+
+Headers:
+- Accept: text/event-stream
+- Authorization: Bearer <token>
+
+Query params (optional):
+- customerId
+- merchantId
+- requestId
+
+Event types:
+- loan_created
+- loan_status_changed
+- loan_decision_changed
+
+Event payload mau:
+{
+  "event": "loan_status_changed",
+  "timestamp": "2026-04-17T10:25:00Z",
+  "data": {
+    "request_id": "REQ_001",
+    "old_status": "SUBMITTED",
+    "new_status": "IN_REVIEW",
+    "updated_at": "2026-04-17T10:25:00Z"
+  }
+}
+
+==================================================
+5) Mapping frontend screens -> API
+==================================================
+5.1 Banker
+- /banker/login
+  - POST /api/auth/login
+- /banker/dashboard
+  - GET /api/stats
+  - GET /api/merchants (table customer)
+- /banker/customer_analysis
+  - GET /api/merchants (filter theo age/location/year/industry/businessType/loanType)
+  - GET /api/stats (neu can KPI tong hop)
+- /banker/loan-requests
+  - GET /api/loans
+- /banker/loan-requests/:requestId
+  - GET /api/loans/{id}
+  - GET /api/transactions?customerId=...
+  - POST /api/loans/{id}/decision
+  - GET /api/loans/stream (optional real-time)
+- /banker/customer/:customerId
+  - GET /api/merchants/{id}
+
+5.2 Customer
+- /customer/login
+  - POST /api/auth/login
+- /customer/profile
+  - GET /api/auth/me
+  - GET /api/merchants/{id} (id lay tu customerId/merchantId cua me)
+- /customer/create-loan
+  - POST /api/loans/evaluate (submit=true)
+- /customer/loans
+  - GET /api/loans?scope=my
+- /customer/loans/:requestId
+  - GET /api/loans/{id}
+  - GET /api/loans/stream (optional)
+
+==================================================
+6) Non-functional requirements cho backend
+==================================================
+- Time format: ISO 8601 UTC (vd 2026-04-17T10:20:30Z)
+- Currency: hien tai VND
+- Pagination bat buoc cho endpoint list lon
+- Co index DB toi thieu:
+  - loans(status, created_at, customer_id)
+  - merchants(customer_id, merchant_id, label)
+  - transactions(customer_id, date)
+- P95 response time muc tieu:
+  - List APIs <= 500ms voi pageSize=20
+  - Detail APIs <= 700ms
+- SSE phai heartbeat moi 20-30s de tranh timeout gateway
+
+==================================================
+7) Ghi chu tuong thich
+==================================================
+- Tai lieu nay chi phat trien tren route set san co, khong them endpoint moi.
+- Neu backend muon clean REST hon cho create loan, co the them POST /api/loans o version sau,
+  nhung KHONG nam trong pham vi version nay.
