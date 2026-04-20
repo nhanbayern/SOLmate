@@ -1,5 +1,7 @@
 <div align="center">
-  <img src="image/Main.png" alt="SOLmate Banner" width="900" />
+  <a href="https://www.youtube.com/watch?v=Xv1EdV0rS1k&t=425s" target="_blank">
+    <img src="https://img.youtube.com/vi/Xv1EdV0rS1k/maxresdefault.jpg" alt="SOLmate Demo Video" width="900" />
+  </a>
   <h1>VIETNAMESE LOAN ADVISORY SYSTEM</h1>
   <p>
     <b>SOLmate is an AI-powered lending platform for transparent, fast, and explainable loan decisions.</b><br />
@@ -122,7 +124,7 @@ The banker experience is focused on fast loan triage and transparent risk decisi
 
 <table style="width: 100%;">
   <tr>
-    <td style="width: 50%;"><img src="image/Main.png" width="100%"></td>
+    <td style="width: 50%;"><a href="https://www.youtube.com/watch?v=Xv1EdV0rS1k&t=425s" target="_blank"><img src="https://img.youtube.com/vi/Xv1EdV0rS1k/maxresdefault.jpg" width="100%"></a></td>
     <td style="width: 50%;"><img src="image/CreditRiskDash.png" width="100%"></td>
   </tr>
   <tr>
